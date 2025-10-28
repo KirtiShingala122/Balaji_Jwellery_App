@@ -1,0 +1,11 @@
+# Flutter
+frontend/build/
+frontend/.dart_tool/
+frontend/.idea/
+
+# Node
+backend/node_modules/
+
+# System
+.DS_Store
+*.log
