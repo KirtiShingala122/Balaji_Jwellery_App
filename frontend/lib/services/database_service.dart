@@ -6,7 +6,7 @@ import '../models/product.dart';
 import '../models/customer.dart';
 import '../models/bill.dart';
 import 'package:flutter/foundation.dart'
-    hide Category; // add this import on top
+ hide Category; // add this import on top
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // add this too
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -29,7 +29,6 @@ class DatabaseService {
       await _onCreate(db, 1);
       return db;
     } else {
-      // ✅ For Android, iOS, Desktop
       String path = join(await getDatabasesPath(), 'balaji_imitation.db');
       return await openDatabase(path, version: 1, onCreate: _onCreate);
     }

@@ -1,16 +1,16 @@
+import 'package:balaji_imitation_admin/main/main_screen.dart';
+import 'package:balaji_imitation_admin/screens/auth/login_scrren.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/main/main_screen.dart';
+
 import 'services/notification_service.dart';
 
 // 👇 Add these imports for database compatibility
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 

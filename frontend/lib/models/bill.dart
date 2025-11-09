@@ -1,63 +1,127 @@
-class Admin {
+class Bill {
   final int? id;
-  final String username;
-  final String password;
-  final String email;
-  final String fullName;
+  final String billNumber;
+  final int customerId;
+  final double subtotal;
+  final double taxAmount;
+  final double discountAmount;
+  final double totalAmount;
+  final DateTime billDate;
+  final String paymentStatus;
+  final String? notes;
   final DateTime createdAt;
-  final DateTime? lastLogin;
 
-  Admin({
+  Bill({
     this.id,
-    required this.username,
-    required this.password,
-    required this.email,
-    required this.fullName,
+    required this.billNumber,
+    required this.customerId,
+    required this.subtotal,
+    required this.taxAmount,
+    required this.discountAmount,
+    required this.totalAmount,
+    required this.billDate,
+    required this.paymentStatus,
+    this.notes,
     required this.createdAt,
-    this.lastLogin,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'username': username,
-      'password': password,
-      'email': email,
-      'fullName': fullName,
+      'billNumber': billNumber,
+      'customerId': customerId,
+      'subtotal': subtotal,
+      'taxAmount': taxAmount,
+      'discountAmount': discountAmount,
+      'totalAmount': totalAmount,
+      'billDate': billDate.toIso8601String(),
+      'paymentStatus': paymentStatus,
+      'notes': notes,
       'createdAt': createdAt.toIso8601String(),
-      'lastLogin': lastLogin?.toIso8601String(),
     };
   }
 
-  factory Admin.fromMap(Map<String, dynamic> map) {
-    return Admin(
+  factory Bill.fromMap(Map<String, dynamic> map) {
+    return Bill(
       id: map['id'],
-      username: map['username'],
-      password: map['password'],
-      email: map['email'],
-      fullName: map['fullName'],
+      billNumber: map['billNumber'],
+      customerId: map['customerId'],
+      subtotal: map['subtotal'].toDouble(),
+      taxAmount: map['taxAmount'].toDouble(),
+      discountAmount: map['discountAmount'].toDouble(),
+      totalAmount: map['totalAmount'].toDouble(),
+      billDate: DateTime.parse(map['billDate']),
+      paymentStatus: map['paymentStatus'],
+      notes: map['notes'],
       createdAt: DateTime.parse(map['createdAt']),
-      lastLogin: map['lastLogin'] != null ? DateTime.parse(map['lastLogin']) : null,
     );
   }
 
-  Admin copyWith({
+  Bill copyWith({
     int? id,
-    String? username,
-    String? password,
-    String? email,
-    String? fullName,
+    String? billNumber,
+    int? customerId,
+    double? subtotal,
+    double? taxAmount,
+    double? discountAmount,
+    double? totalAmount,
+    DateTime? billDate,
+    String? paymentStatus,
+    String? notes,
     DateTime? createdAt,
-    DateTime? lastLogin,
   }) {
-    return Admin(
+    return Bill(
       id: id ?? this.id,
-      username: username ?? this.username,
-      password: password ?? this.password,
-      email: email ?? this.email,
-      fullName: fullName ?? this.fullName,
+      billNumber: billNumber ?? this.billNumber,
+      customerId: customerId ?? this.customerId,
+      subtotal: subtotal ?? this.subtotal,
+      taxAmount: taxAmount ?? this.taxAmount,
+      discountAmount: discountAmount ?? this.discountAmount,
+      totalAmount: totalAmount ?? this.totalAmount,
+      billDate: billDate ?? this.billDate,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
-      lastLogin: lastLogin ?? this.lastLogin,
+    );
+  }
+}
+
+class BillItem {
+  final int? id;
+  final int billId;
+  final int productId;
+  final int quantity;
+  final double unitPrice;
+  final double totalPrice;
+
+  BillItem({
+    this.id,
+    required this.billId,
+    required this.productId,
+    required this.quantity,
+    required this.unitPrice,
+    required this.totalPrice,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'billId': billId,
+      'productId': productId,
+      'quantity': quantity,
+      'unitPrice': unitPrice,
+      'totalPrice': totalPrice,
+    };
+  }
+
+  factory BillItem.fromMap(Map<String, dynamic> map) {
+    return BillItem(
+      id: map['id'],
+      billId: map['billId'],
+      productId: map['productId'],
+      quantity: map['quantity'],
+      unitPrice: map['unitPrice'].toDouble(),
+      totalPrice: map['totalPrice'].toDouble(),
     );
   }
 }

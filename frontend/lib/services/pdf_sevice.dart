@@ -22,12 +22,14 @@ class PDFService {
 
     // Get customer details
     final customer = await _databaseService.getCustomerById(bill.customerId);
-    
+
     // Get product details for each bill item
     final List<Map<String, dynamic>> productDetails = [];
     for (final item in billItems) {
       final product = await _databaseService.getProductById(item.productId);
-      final category = product != null ? await _databaseService.getCategoryById(product.categoryId) : null;
+      final category = product != null
+          ? await _databaseService.getCategoryById(product.categoryId)
+          : null;
       productDetails.add({
         'product': product,
         'category': category,
@@ -45,23 +47,23 @@ class PDFService {
               // Header
               _buildHeader(),
               pw.SizedBox(height: 20),
-              
+
               // Bill Information
               _buildBillInfo(bill),
               pw.SizedBox(height: 20),
-              
+
               // Customer Information
               if (customer != null) _buildCustomerInfo(customer),
               pw.SizedBox(height: 20),
-              
+
               // Items Table
               _buildItemsTable(productDetails),
               pw.SizedBox(height: 20),
-              
+
               // Totals
               _buildTotals(bill),
               pw.SizedBox(height: 30),
-              
+
               // Footer
               _buildFooter(),
             ],
@@ -94,18 +96,12 @@ class PDFService {
           pw.SizedBox(height: 8),
           pw.Text(
             'Admin Management System',
-            style: pw.TextStyle(
-              fontSize: 16,
-              color: PdfColors.blue700,
-            ),
+            style: pw.TextStyle(fontSize: 16, color: PdfColors.blue700),
           ),
           pw.SizedBox(height: 8),
           pw.Text(
             'Your Trusted Jewelry Partner',
-            style: pw.TextStyle(
-              fontSize: 12,
-              color: PdfColors.blue600,
-            ),
+            style: pw.TextStyle(fontSize: 12, color: PdfColors.blue600),
           ),
         ],
       ),
@@ -137,7 +133,9 @@ class PDFService {
               'Status: ${bill.paymentStatus.toUpperCase()}',
               style: pw.TextStyle(
                 fontSize: 12,
-                color: bill.paymentStatus == 'paid' ? PdfColors.green : PdfColors.red,
+                color: bill.paymentStatus == 'paid'
+                    ? PdfColors.green
+                    : PdfColors.red,
               ),
             ),
           ],
@@ -163,9 +161,18 @@ class PDFService {
           ),
           pw.SizedBox(height: 8),
           pw.Text('Name: ${customer.name}', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Email: ${customer.email}', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Phone: ${customer.phoneNumber}', style: pw.TextStyle(fontSize: 12)),
-          pw.Text('Address: ${customer.address}', style: pw.TextStyle(fontSize: 12)),
+          pw.Text(
+            'Email: ${customer.email}',
+            style: pw.TextStyle(fontSize: 12),
+          ),
+          pw.Text(
+            'Phone: ${customer.phoneNumber}',
+            style: pw.TextStyle(fontSize: 12),
+          ),
+          pw.Text(
+            'Address: ${customer.address}',
+            style: pw.TextStyle(fontSize: 12),
+          ),
         ],
       ),
     );
@@ -202,7 +209,7 @@ class PDFService {
           final product = data['product'] as Product?;
           final category = data['category'] as Category?;
           final item = data['item'] as BillItem;
-          
+
           return pw.TableRow(
             children: [
               _buildTableCell('$index'),
@@ -241,7 +248,10 @@ class PDFService {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text('Subtotal:', style: pw.TextStyle(fontSize: 12)),
-              pw.Text('₹${bill.subtotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                '₹${bill.subtotal.toStringAsFixed(2)}',
+                style: pw.TextStyle(fontSize: 12),
+              ),
             ],
           ),
           pw.SizedBox(height: 4),
@@ -249,7 +259,10 @@ class PDFService {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text('Tax:', style: pw.TextStyle(fontSize: 12)),
-              pw.Text('₹${bill.taxAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                '₹${bill.taxAmount.toStringAsFixed(2)}',
+                style: pw.TextStyle(fontSize: 12),
+              ),
             ],
           ),
           pw.SizedBox(height: 4),
@@ -257,7 +270,10 @@ class PDFService {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text('Discount:', style: pw.TextStyle(fontSize: 12)),
-              pw.Text('-₹${bill.discountAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 12)),
+              pw.Text(
+                '-₹${bill.discountAmount.toStringAsFixed(2)}',
+                style: pw.TextStyle(fontSize: 12),
+              ),
             ],
           ),
           pw.Divider(color: PdfColors.grey400),
@@ -266,11 +282,17 @@ class PDFService {
             children: [
               pw.Text(
                 'Total Amount:',
-                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               pw.Text(
                 '₹${bill.totalAmount.toStringAsFixed(2)}',
-                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
             ],
           ),

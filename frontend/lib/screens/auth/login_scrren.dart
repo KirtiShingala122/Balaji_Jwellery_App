@@ -1,3 +1,4 @@
+import 'package:balaji_imitation_admin/main/main_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import '../main/main_screen.dart';
 import '../auth/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
