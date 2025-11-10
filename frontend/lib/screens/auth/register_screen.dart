@@ -8,7 +8,6 @@ import '../../models/admin.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 
-
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -336,7 +335,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         fullName: _fullNameController.text.trim(),
         password: _passwordController.text,
-        createdAt: DateTime.now(),
       );
 
       final success = await authProvider.register(admin);

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/category.dart';
-import '../../services/database_service.dart';
+import '../../services/category_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/category_card.dart';
@@ -15,7 +15,8 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  final DatabaseService _databaseService = DatabaseService();
+  final CategoryService _categoryService =
+      CategoryService(); // 
   List<Category> _categories = [];
   bool _isLoading = false;
   String? _errorMessage;
@@ -34,7 +35,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     });
 
     try {
-      final categories = await _databaseService.getAllCategories();
+      //  use _categoryService instead of _databaseService
+      final categories = await _categoryService.getAllCategories();
       setState(() {
         _categories = categories;
         _isLoading = false;
@@ -123,7 +125,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ),
                 ),
                 SizedBox(width: 16.w),
-                // Add Category Button
                 CustomButton(
                   text: 'Add Category',
                   icon: Icons.add,
@@ -314,14 +315,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     try {
       if (existingCategory == null) {
-        // Add new category
+        //  Add new category via backend
         final category = Category(
           name: name.trim(),
           description: description.trim(),
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
-        await _databaseService.insertCategory(category);
+        await _categoryService.addCategory(category);
       } else {
         // Update existing category
         final updatedCategory = existingCategory.copyWith(
@@ -329,7 +330,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           description: description.trim(),
           updatedAt: DateTime.now(),
         );
-        await _databaseService.updateCategory(updatedCategory);
+        await _categoryService.updateCategory(updatedCategory);
       }
 
       if (mounted) {
@@ -388,7 +389,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   Future<void> _deleteCategory(Category category) async {
     try {
-      await _databaseService.deleteCategory(category.id!);
+      await _categoryService.deleteCategory(category.id!);
       if (mounted) {
         Navigator.pop(context);
         _loadCategories();
@@ -413,7 +414,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   void _navigateToProducts(Category category) {
-    // TODO: Navigate to products screen filtered by category
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Navigate to products for ${category.name}')),
     );

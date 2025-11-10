@@ -1,134 +1,96 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../models/admin.dart';
-import 'database_service.dart';
 
 class AuthService {
-  static final AuthService _instance = AuthService._internal();
-  factory AuthService() => _instance;
-  AuthService._internal();
+  static const String baseUrl = 'http://localhost:3000/api/auth';
+  //static const String baseUrl = 'http://10.0.2.2:3000/api/auth';
 
-  final DatabaseService _databaseService = DatabaseService();
   Admin? _currentAdmin;
   bool _isLoggedIn = false;
+  String? _token; // Store JWT token
 
   Admin? get currentAdmin => _currentAdmin;
   bool get isLoggedIn => _isLoggedIn;
+  String? get token => _token;
 
-  Future<bool> login(String username, String password) async {
-    try {
-      final admin = await _databaseService.getAdminByUsername(username);
-
-      if (admin != null && admin.password == password) {
-        _currentAdmin = admin;
-        _isLoggedIn = true;
-
-        // Update last login
-        await _databaseService.updateAdminLastLogin(admin.id!);
-
-        // Save login state
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
-        await prefs.setInt('adminId', admin.id!);
-
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('Login error: $e');
-      return false;
-    }
-  }
-
+  ///  Register new admin
   Future<bool> register(Admin admin) async {
+    final url = Uri.parse('$baseUrl/register');
     try {
-      // Check if username already exists
-      final existingAdmin = await _databaseService.getAdminByUsername(
-        admin.username,
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': admin.username,
+          'email': admin.email,
+          'fullName': admin.fullName,
+          'password': admin.password,
+        }),
       );
-      if (existingAdmin != null) {
-        print('Username already exists: ${admin.username}');
-        return false; // Username already exists
-      }
 
-      // Insert new admin
-      final adminId = await _databaseService.insertAdmin(admin);
-      if (adminId > 0) {
-        _currentAdmin = admin.copyWith(id: adminId);
+      if (response.statusCode == 201) {
+        print(' Registration successful');
+        return true;
+      } else {
+        print(' Register failed: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print(' Register error: $e');
+      return false;
+    }
+  }
+
+  /// Login existing admin
+  Future<bool> login(String username, String password) async {
+    final url = Uri.parse('$baseUrl/login');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        _currentAdmin = Admin.fromMap(data['admin']);
+        _token = data['token']; // Save JWT
         _isLoggedIn = true;
 
-        // Save login state
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
-        await prefs.setInt('adminId', adminId);
-
+        print(' Login successful for ${_currentAdmin?.username}');
         return true;
+      } else {
+        print(' Login failed: ${response.body}');
+        return false;
       }
-      return false;
     } catch (e) {
-      print('Registration error: $e');
+      print(' Login error: $e');
       return false;
     }
   }
 
+  ///  Logout
   Future<void> logout() async {
-    _currentAdmin = null;
     _isLoggedIn = false;
-
-    // Clear login state
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('isLoggedIn');
-    await prefs.remove('adminId');
+    _currentAdmin = null;
+    _token = null;
+    print(' Logged out');
   }
 
+  ///  Check login status (for app start)
   Future<bool> checkLoginStatus() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-      final adminId = prefs.getInt('adminId');
-
-      if (isLoggedIn && adminId != null) {
-        // Verify admin still exists
-        final admin = await _databaseService.getAdminByUsername(
-          _currentAdmin?.username ?? '',
-        );
-        if (admin != null) {
-          _currentAdmin = admin;
-          _isLoggedIn = true;
-          return true;
-        }
-      }
-
-      await logout();
-      return false;
-    } catch (e) {
-      print('Check login status error: $e');
-      await logout();
-      return false;
-    }
+    // You can enhance this later to validate token expiry
+    return _isLoggedIn;
   }
 
+  ///  Change Password (to be implemented later)
   Future<bool> changePassword(
     String currentPassword,
     String newPassword,
   ) async {
-    if (_currentAdmin == null) return false;
-
-    if (_currentAdmin!.password != currentPassword) {
-      return false; // Current password is incorrect
-    }
-
-    try {
-      final updatedAdmin = _currentAdmin!.copyWith(password: newPassword);
-      final result = await _databaseService.updateAdmin(updatedAdmin);
-
-      if (result > 0) {
-        _currentAdmin = updatedAdmin;
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('Change password error: $e');
-      return false;
-    }
+    print(' Change password feature not implemented yet.');
+    return false;
   }
 }

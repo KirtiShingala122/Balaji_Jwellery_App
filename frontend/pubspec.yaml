@@ -10,12 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # Database
-  sqflite: ^2.3.0
-  sqflite_common_ffi: ^2.3.0+2
-  sqflite_common_ffi_web: ^0.4.0
-  path: ^1.8.3
+  # node
+  http: ^1.1.0
 
   # UI and Navigation
   flutter_screenutil: ^5.9.0
@@ -39,8 +35,7 @@ dependencies:
   # Date and Time
   intl: ^0.19.0
 
-  # File handling
-  path_provider: ^2.1.2
+  
 
   # Social sharing
   share_plus: ^7.2.2

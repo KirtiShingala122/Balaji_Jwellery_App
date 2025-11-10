@@ -6,27 +6,10 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
-
 import 'services/notification_service.dart';
-
-// 👇 Add these imports for database compatibility
-import 'package:flutter/foundation.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 👇 Add this block to make DB work in Chrome (Web) and Windows/Linux/Mac
-  if (kIsWeb) {
-    // Running on Chrome/Web — use web-safe database
-    databaseFactory = databaseFactoryFfiWeb;
-  } else {
-    // Running on Windows/Linux/Mac — initialize FFI
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
-
   // Initialize notification service
   final notificationService = NotificationService();
   await notificationService.initialize();

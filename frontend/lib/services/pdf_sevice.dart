@@ -8,27 +8,34 @@ import '../models/bill.dart';
 import '../models/customer.dart';
 import '../models/product.dart';
 import '../models/category.dart';
-import 'database_service.dart';
+import '../services/product_service.dart' as productService;
+import '../services/customer_service.dart' as customerService;
+import '../services/category_service.dart' as categoryService;
 
 class PDFService {
   static final PDFService _instance = PDFService._internal();
   factory PDFService() => _instance;
   PDFService._internal();
 
-  final DatabaseService _databaseService = DatabaseService();
+  final productService.ProductService _productService =
+      productService.ProductService();
+  final customerService.CustomerService _customerService =
+      customerService.CustomerService();
+  final categoryService.CategoryService _categoryService =
+      categoryService.CategoryService();
 
   Future<Uint8List> generateBillPDF(Bill bill, List<BillItem> billItems) async {
     final pdf = pw.Document();
 
-    // Get customer details
-    final customer = await _databaseService.getCustomerById(bill.customerId);
+    // Get customer details from backend
+    final customer = await _customerService.getCustomerById(bill.customerId);
 
-    // Get product details for each bill item
+    //  Get product + category details for each bill item
     final List<Map<String, dynamic>> productDetails = [];
     for (final item in billItems) {
-      final product = await _databaseService.getProductById(item.productId);
+      final product = await _productService.getProductById(item.productId);
       final category = product != null
-          ? await _databaseService.getCategoryById(product.categoryId)
+          ? await _categoryService.getCategoryById(product.categoryId)
           : null;
       productDetails.add({
         'product': product,
@@ -44,27 +51,16 @@ class PDFService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Header
               _buildHeader(),
               pw.SizedBox(height: 20),
-
-              // Bill Information
               _buildBillInfo(bill),
               pw.SizedBox(height: 20),
-
-              // Customer Information
               if (customer != null) _buildCustomerInfo(customer),
               pw.SizedBox(height: 20),
-
-              // Items Table
               _buildItemsTable(productDetails),
               pw.SizedBox(height: 20),
-
-              // Totals
               _buildTotals(bill),
               pw.SizedBox(height: 30),
-
-              // Footer
               _buildFooter(),
             ],
           );
@@ -126,19 +122,14 @@ class PDFService {
             ),
           ],
         ),
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.end,
-          children: [
-            pw.Text(
-              'Status: ${bill.paymentStatus.toUpperCase()}',
-              style: pw.TextStyle(
-                fontSize: 12,
-                color: bill.paymentStatus == 'paid'
-                    ? PdfColors.green
-                    : PdfColors.red,
-              ),
-            ),
-          ],
+        pw.Text(
+          'Status: ${bill.paymentStatus.toUpperCase()}',
+          style: pw.TextStyle(
+            fontSize: 12,
+            color: bill.paymentStatus == 'paid'
+                ? PdfColors.green
+                : PdfColors.red,
+          ),
         ),
       ],
     );
@@ -190,7 +181,6 @@ class PDFService {
         5: const pw.FlexColumnWidth(1),
       },
       children: [
-        // Header
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           children: [
@@ -202,7 +192,6 @@ class PDFService {
             _buildTableCell('Total', isHeader: true),
           ],
         ),
-        // Items
         ...productDetails.asMap().entries.map((entry) {
           final index = entry.key + 1;
           final data = entry.value;
@@ -244,60 +233,29 @@ class PDFService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Subtotal:', style: pw.TextStyle(fontSize: 12)),
-              pw.Text(
-                '₹${bill.subtotal.toStringAsFixed(2)}',
-                style: pw.TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Tax:', style: pw.TextStyle(fontSize: 12)),
-              pw.Text(
-                '₹${bill.taxAmount.toStringAsFixed(2)}',
-                style: pw.TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Discount:', style: pw.TextStyle(fontSize: 12)),
-              pw.Text(
-                '-₹${bill.discountAmount.toStringAsFixed(2)}',
-                style: pw.TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
+          _totalRow('Subtotal:', bill.subtotal),
+          _totalRow('Tax:', bill.taxAmount),
+          _totalRow('Discount:', -bill.discountAmount),
           pw.Divider(color: PdfColors.grey400),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(
-                'Total Amount:',
-                style: pw.TextStyle(
-                  fontSize: 14,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              pw.Text(
-                '₹${bill.totalAmount.toStringAsFixed(2)}',
-                style: pw.TextStyle(
-                  fontSize: 14,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          _totalRow('Total Amount:', bill.totalAmount, isBold: true),
         ],
       ),
+    );
+  }
+
+  pw.Widget _totalRow(String label, double value, {bool isBold = false}) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Text(label, style: pw.TextStyle(fontSize: 12)),
+        pw.Text(
+          '₹${value.toStringAsFixed(2)}',
+          style: pw.TextStyle(
+            fontSize: isBold ? 14 : 12,
+            fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 
@@ -325,9 +283,7 @@ class PDFService {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
 
   Future<void> printBill(Bill bill, List<BillItem> billItems) async {
     final pdfBytes = await generateBillPDF(bill, billItems);

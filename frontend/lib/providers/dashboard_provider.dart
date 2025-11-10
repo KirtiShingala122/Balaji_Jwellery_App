@@ -1,9 +1,9 @@
+import 'package:balaji_imitation_admin/services/dashboard_service.dart';
 import 'package:flutter/foundation.dart';
-import '../services/database_service.dart';
 
 class DashboardProvider with ChangeNotifier {
-  final DatabaseService _databaseService = DatabaseService();
-  
+  final DashboardService _dashboardService = DashboardService();
+
   int _totalCategories = 0;
   int _totalProducts = 0;
   int _totalCustomers = 0;
@@ -23,17 +23,12 @@ class DashboardProvider with ChangeNotifier {
     _clearError();
 
     try {
-      final futures = await Future.wait([
-        _databaseService.getTotalCategories(),
-        _databaseService.getTotalProducts(),
-        _databaseService.getTotalCustomers(),
-        _databaseService.getTotalSales(),
-      ]);
+      final data = await _dashboardService.getDashboardStats();
 
-      _totalCategories = futures[0] as int;
-      _totalProducts = futures[1] as int;
-      _totalCustomers = futures[2] as int;
-      _totalSales = futures[3] as double;
+      _totalCategories = data['totalCategories'] ?? 0;
+      _totalProducts = data['totalProducts'] ?? 0;
+      _totalCustomers = data['totalCustomers'] ?? 0;
+      _totalSales = (data['totalSales'] ?? 0.0).toDouble();
 
       notifyListeners();
     } catch (e) {

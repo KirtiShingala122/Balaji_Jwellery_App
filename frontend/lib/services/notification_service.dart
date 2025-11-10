@@ -1,24 +1,27 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/product.dart';
-import 'database_service.dart';
+import '../services/product_service.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
-  final DatabaseService _databaseService = DatabaseService();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+  final ProductService _productService = ProductService();
 
   Future<void> initialize() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    
+
     const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
@@ -34,8 +37,8 @@ class NotificationService {
 
   Future<void> checkLowStockProducts() async {
     try {
-      final lowStockProducts = await _databaseService.getLowStockProducts();
-      
+      final lowStockProducts = await _productService.getLowStockProducts();
+
       if (lowStockProducts.isNotEmpty) {
         for (final product in lowStockProducts) {
           await _showLowStockNotification(product);
@@ -83,17 +86,7 @@ class NotificationService {
       priority: Priority.high,
     );
 
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
+    const details = NotificationDetails(android: androidDetails);
     await _notifications.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
       title,
@@ -111,17 +104,7 @@ class NotificationService {
       priority: Priority.high,
     );
 
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
+    const details = NotificationDetails(android: androidDetails);
     await _notifications.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
       title,
