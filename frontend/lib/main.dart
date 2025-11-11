@@ -1,5 +1,5 @@
 import 'package:balaji_imitation_admin/main/main_screen.dart';
-import 'package:balaji_imitation_admin/screens/auth/login_scrren.dart';
+import 'package:balaji_imitation_admin/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +10,7 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   // Initialize notification service
   final notificationService = NotificationService();
   await notificationService.initialize();
@@ -23,82 +24,97 @@ class BalajiImitationApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(1920, 1080), // Desktop design size
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        return MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => AuthProvider()),
-            ChangeNotifierProvider(create: (_) => DashboardProvider()),
-          ],
-          child: MaterialApp(
-            title: 'Balaji Imitation Admin',
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              primarySwatch: Colors.blue,
-              primaryColor: const Color(0xFF1E3A8A),
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xFF1E3A8A),
-                brightness: Brightness.light,
-              ),
-              textTheme: GoogleFonts.poppinsTextTheme(),
-              appBarTheme: AppBarTheme(
-                backgroundColor: const Color(0xFF1E3A8A),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                centerTitle: true,
-                titleTextStyle: GoogleFonts.poppins(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Automatically adjust the design size based on device width
+        Size baseSize;
+
+        if (constraints.maxWidth <= 600) {
+          baseSize = const Size(390, 844); // 📱 phones
+        } else if (constraints.maxWidth <= 1100) {
+          baseSize = const Size(800, 1280); // 💻 tablets
+        } else {
+          baseSize = const Size(1920, 1080); // 🖥️ desktops/laptops
+        }
+
+        return ScreenUtilInit(
+          designSize: baseSize,
+          minTextAdapt: true,
+          splitScreenMode: true,
+          builder: (context, child) {
+            return MultiProvider(
+              providers: [
+                ChangeNotifierProvider(create: (_) => AuthProvider()),
+                ChangeNotifierProvider(create: (_) => DashboardProvider()),
+              ],
+              child: MaterialApp(
+                title: 'Balaji Imitation Admin',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  primarySwatch: Colors.blue,
+                  primaryColor: const Color(0xFF1E3A8A),
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF1E3A8A),
+                    brightness: Brightness.light,
+                  ),
+                  textTheme: GoogleFonts.poppinsTextTheme(),
+                  appBarTheme: AppBarTheme(
+                    backgroundColor: const Color(0xFF1E3A8A),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    centerTitle: true,
+                    titleTextStyle: GoogleFonts.poppins(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  elevatedButtonTheme: ElevatedButtonThemeData(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF3B82F6),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                  ),
+                  inputDecorationTheme: InputDecorationTheme(
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF3B82F6),
+                        width: 2,
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: const BorderSide(color: Colors.red),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    ),
                   ),
                 ),
+                home: const AuthWrapper(),
+                routes: {
+                  '/login': (context) => const LoginScreen(),
+                  '/main': (context) => const MainScreen(),
+                },
               ),
-              inputDecorationTheme: InputDecorationTheme(
-                filled: true,
-                fillColor: Colors.grey[50],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF3B82F6),
-                    width: 2,
-                  ),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(color: Colors.red),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(color: Colors.red, width: 2),
-                ),
-              ),
-            ),
-            home: const AuthWrapper(),
-            routes: {
-              '/login': (context) => const LoginScreen(),
-              '/main': (context) => const MainScreen(),
-            },
-          ),
+            );
+          },
         );
       },
     );
@@ -124,22 +140,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final isLoggedIn = await authProvider.checkLoginStatus();
 
     if (mounted) {
-      if (isLoggedIn) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              isLoggedIn ? const MainScreen() : const LoginScreen(),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
   }
 }
