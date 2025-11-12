@@ -5,6 +5,8 @@ import '../../models/category.dart';
 import '../../services/category_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/category_card.dart';
+import '../main/product_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -51,10 +53,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     return _categories
         .where(
           (category) =>
-              category.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              category.description
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()),
+              category.name.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              ) ||
+              category.description.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              ),
         )
         .toList();
   }
@@ -71,8 +75,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null
-                      ? _buildErrorWidget()
-                      : _buildResponsiveGrid(),
+                  ? _buildErrorWidget()
+                  : _buildResponsiveGrid(),
             ),
           ],
         ),
@@ -141,8 +145,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     color: Colors.grey[500],
                   ),
                   border: InputBorder.none,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10.w,
+                    vertical: 10.h,
+                  ),
                 ),
               ),
             ),
@@ -159,10 +165,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       return Center(
         child: Text(
           'No categories found',
-          style: GoogleFonts.poppins(
-            fontSize: 16.sp,
-            color: Colors.grey[600],
-          ),
+          style: GoogleFonts.poppins(fontSize: 16.sp, color: Colors.grey[600]),
         ),
       );
     }
@@ -312,8 +315,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   ],
                 ),
                 Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 5.h,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEEDDD8), // light brown chip
                     borderRadius: BorderRadius.circular(20.r),
@@ -336,29 +341,26 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Widget _buildErrorWidget() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64.w, color: Colors.red),
-            SizedBox(height: 16.h),
-            Text(
-              _errorMessage ?? 'Unknown error',
-              style: GoogleFonts.poppins(
-                fontSize: 16.sp,
-                color: Colors.red,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 16.h),
-            CustomButton(
-              text: 'Retry',
-              onPressed: _loadCategories,
-              width: 120.w,
-              backgroundColor: const Color(0xFFB48F85),
-            ),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.error_outline, size: 64.w, color: Colors.red),
+        SizedBox(height: 16.h),
+        Text(
+          _errorMessage ?? 'Unknown error',
+          style: GoogleFonts.poppins(fontSize: 16.sp, color: Colors.red),
+          textAlign: TextAlign.center,
         ),
-      );
+        SizedBox(height: 16.h),
+        CustomButton(
+          text: 'Retry',
+          onPressed: _loadCategories,
+          width: 120.w,
+          backgroundColor: const Color(0xFFB48F85),
+        ),
+      ],
+    ),
+  );
 
   // ADD / EDIT DIALOG
   void _showAddCategoryDialog() => _showCategoryDialog();
@@ -367,15 +369,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   void _showCategoryDialog({Category? category}) {
     final nameController = TextEditingController(text: category?.name ?? '');
-    final descriptionController =
-        TextEditingController(text: category?.description ?? '');
+    final descriptionController = TextEditingController(
+      text: category?.description ?? '',
+    );
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
         title: Text(
           category == null ? 'Add Category' : 'Edit Category',
           style: GoogleFonts.poppins(
@@ -392,8 +397,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 controller: nameController,
                 labelText: 'Category Name',
                 prefixIcon: Icons.category_outlined,
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Enter category name' : null,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Enter category name'
+                    : null,
               ),
               SizedBox(height: 16.h),
               CustomTextField(
@@ -473,9 +479,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     }
   }
@@ -484,7 +490,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
         title: Text(
           'Delete Category',
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
@@ -496,7 +504,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
           ),
           CustomButton(
             text: 'Delete',
@@ -525,16 +536,19 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     }
   }
 
   void _navigateToProducts(Category category) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Navigate to products for ${category.name}')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductsScreen(category: category),
+      ),
     );
   }
 }

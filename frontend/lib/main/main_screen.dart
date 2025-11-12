@@ -30,11 +30,6 @@ class _MainScreenState extends State<MainScreen> {
       screen: const CategoriesScreen(),
     ),
     MainScreenItem(
-      title: 'Products',
-      icon: Icons.inventory,
-      screen: const ProductsScreen(),
-    ),
-    MainScreenItem(
       title: 'Billing',
       icon: Icons.receipt,
       screen: const BillingScreen(),
@@ -307,15 +302,6 @@ class MainScreenItem {
     required this.icon,
     required this.screen,
   });
-}
-
-class ProductsScreen extends StatelessWidget {
-  const ProductsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Products Screen - Coming Soon'));
-  }
 }
 
 class BillingScreen extends StatelessWidget {

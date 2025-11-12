@@ -41,15 +41,30 @@ class Product {
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
       id: map['id'],
-      uniqueCode: map['uniqueCode'],
-      name: map['name'],
-      description: map['description'],
-      categoryId: map['categoryId'],
-      price: map['price'].toDouble(),
-      stockQuantity: map['stockQuantity'],
+      uniqueCode: map['uniqueCode'] ?? '',
+      name: map['name'] ?? '',
+      description: map['description'] ?? '',
+      categoryId: map['categoryId'] ?? 0,
+
+      // ✅ Safe parsing for price (handles string or number)
+      price: map['price'] is num
+          ? (map['price'] as num).toDouble()
+          : double.tryParse(map['price'].toString()) ?? 0.0,
+
+      // ✅ Safe parsing for stockQuantity
+      stockQuantity: map['stockQuantity'] is num
+          ? (map['stockQuantity'] as num).toInt()
+          : int.tryParse(map['stockQuantity'].toString()) ?? 0,
+
       imagePath: map['imagePath'],
-      createdAt: DateTime.parse(map['createdAt']),
-      updatedAt: DateTime.parse(map['updatedAt']),
+
+      // ✅ Parse createdAt / updatedAt safely
+      createdAt: map['createdAt'] != null
+          ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.tryParse(map['updatedAt'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 

@@ -12,7 +12,9 @@ dependencies:
     sdk: flutter
   # node
   http: ^1.1.0
-
+  image_picker: ^1.0.7
+  file_picker: ^5.5.0
+  dio: ^5.5.0
   # UI and Navigation
   flutter_screenutil: ^5.9.0
   google_fonts: ^6.2.1
@@ -22,9 +24,7 @@ dependencies:
   provider: ^6.1.1
 
   # Image handling
-  image_picker: ^1.0.7
   cached_network_image: ^3.3.1
-
   # PDF Generation
   pdf: ^3.10.7
   printing: ^5.12.0

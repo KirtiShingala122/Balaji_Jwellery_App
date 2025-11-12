@@ -1,19 +1,35 @@
 const db = require('../db');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 
-// Get all products
+// ✅ Ensure uploads folder exists
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+
+// ✅ Configure multer
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+});
+
+exports.upload = multer({ storage });
+
+// ✅ Get all products
 exports.getAllProducts = (req, res) => {
     const query = `
     SELECT p.*, c.name AS categoryName
     FROM products p
     JOIN categories c ON p.categoryId = c.id
     ORDER BY p.id DESC`;
+
     db.query(query, (err, results) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         res.json(results);
     });
 };
 
-//  Get product by ID
+// ✅ Get product by ID
 exports.getProductById = (req, res) => {
     const { id } = req.params;
     db.query('SELECT * FROM products WHERE id = ?', [id], (err, results) => {
@@ -23,7 +39,7 @@ exports.getProductById = (req, res) => {
     });
 };
 
-//  Get low-stock products
+// ✅ Get low-stock products
 exports.getLowStockProducts = (req, res) => {
     db.query('SELECT * FROM products WHERE stockQuantity < 5', (err, results) => {
         if (err) return res.status(500).json({ error: 'Failed to fetch low-stock' });
@@ -31,34 +47,41 @@ exports.getLowStockProducts = (req, res) => {
     });
 };
 
-//  Add product
+// ✅ Add product with image
 exports.addProduct = (req, res) => {
     const { uniqueCode, name, description, categoryId, price, stockQuantity } = req.body;
+    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+
     db.query(
-        'INSERT INTO products (uniqueCode, name, description, categoryId, price, stockQuantity) VALUES (?, ?, ?, ?, ?, ?)',
-        [uniqueCode, name, description, categoryId, price, stockQuantity],
+        'INSERT INTO products (uniqueCode, name, description, categoryId, price, stockQuantity, imagePath) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [uniqueCode, name, description, categoryId, price, stockQuantity, imagePath],
         (err, result) => {
             if (err) return res.status(500).json({ error: 'Failed to add product' });
-            res.status(201).json({ message: 'Product added', id: result.insertId });
+
+            const fullImageUrl = imagePath ? `${req.protocol}://${req.get('host')}${imagePath}` : null;
+            res.status(201).json({ message: 'Product added', id: result.insertId, imageUrl: fullImageUrl });
         }
     );
 };
 
-//  Update product
+// ✅ Update product with image
 exports.updateProduct = (req, res) => {
     const { id } = req.params;
-    const { name, description, categoryId, price, stockQuantity } = req.body;
+    const { uniqueCode, name, description, categoryId, price, stockQuantity } = req.body;
+    const imagePath = req.file ? `/uploads/${req.file.filename}` : req.body.imagePath;
+
     db.query(
-        'UPDATE products SET name=?, description=?, categoryId=?, price=?, stockQuantity=? WHERE id=?',
-        [name, description, categoryId, price, stockQuantity, id],
+        'UPDATE products SET uniqueCode=?, name=?, description=?, categoryId=?, price=?, stockQuantity=?, imagePath=? WHERE id=?',
+        [uniqueCode, name, description, categoryId, price, stockQuantity, imagePath, id],
         (err) => {
             if (err) return res.status(500).json({ error: 'Failed to update product' });
-            res.json({ message: 'Product updated successfully' });
+            const fullImageUrl = imagePath ? `${req.protocol}://${req.get('host')}${imagePath}` : null;
+            res.json({ message: 'Product updated successfully', imageUrl: fullImageUrl });
         }
     );
 };
 
-//  Delete product
+// ✅ Delete product
 exports.deleteProduct = (req, res) => {
     const { id } = req.params;
     db.query('DELETE FROM products WHERE id=?', [id], (err) => {

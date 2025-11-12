@@ -6,14 +6,15 @@ const {
     addProduct,
     updateProduct,
     deleteProduct,
-    getLowStockProducts
+    getLowStockProducts,
+    upload,
 } = require('../controllers/productController');
 
 router.get('/', getAllProducts);
 router.get('/low-stock', getLowStockProducts);
 router.get('/:id', getProductById);
-router.post('/', addProduct);
-router.put('/:id', updateProduct);
+router.post('/', upload.single('image'), addProduct);
+router.put('/:id', upload.single('image'), updateProduct);
 router.delete('/:id', deleteProduct);
 
 module.exports = router;
