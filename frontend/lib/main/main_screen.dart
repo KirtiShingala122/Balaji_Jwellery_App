@@ -18,6 +18,9 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   late PageController _pageController;
 
+  // Responsive breakpoint
+  static const double _desktopBreakpoint = 800;
+
   final List<MainScreenItem> _screens = [
     MainScreenItem(
       title: 'Dashboard',
@@ -74,13 +77,163 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < _desktopBreakpoint;
+
+    if (isMobile) {
+      return _buildMobileLayout();
+    } else {
+      return _buildDesktopLayout();
+    }
+  }
+
+  // ============== MOBILE LAYOUT ==============
+  Widget _buildMobileLayout() {
+    return Scaffold(
+      appBar: _buildMobileAppBar(),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        children: _screens.map((item) => item.screen).toList(),
+      ),
+      bottomNavigationBar: _buildMobileBottomNav(),
+    );
+  }
+
+  // Mobile AppBar (Logo + User Icon)
+  AppBar _buildMobileAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF1E3A8A),
+      elevation: 2,
+      leading: Padding(
+        padding: EdgeInsets.all(8.w),
+        child: Row(
+          children: [
+            Icon(Icons.diamond, size: 28.w, color: Colors.white),
+            SizedBox(width: 4.w),
+            Text(
+              'Balaji',
+              style: GoogleFonts.poppins(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+      leadingWidth: 110.w,
+      actions: [
+        // User icon in top right - tap to go to Settings
+        Consumer<AuthProvider>(
+          builder: (context, auth, child) {
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _currentIndex = 5; // Settings index
+                });
+                _pageController.animateToPage(
+                  5,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                child: Center(
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    radius: 18.r,
+                    child: Icon(
+                      Icons.person,
+                      size: 20.w,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // Mobile Bottom Navigation Bar
+  Widget _buildMobileBottomNav() {
+    return BottomNavigationBar(
+      backgroundColor: const Color(0xFF1E3A8A),
+      type: BottomNavigationBarType.fixed,
+      currentIndex: _getBottomNavIndex(),
+      onTap: (index) {
+        // Map bottom nav index back to page index
+        // Order: Categories(0), Customers(1), Dashboard/Home(2), Billing(3), Settings(4)
+        final pageIndices = [1, 3, 0, 2, 5];
+        final pageIndex = pageIndices[index];
+
+        setState(() {
+          _currentIndex = pageIndex;
+        });
+        _pageController.animateToPage(
+          pageIndex,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      },
+      items: [
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.category),
+          label: 'Categories',
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.people),
+          label: 'Customers',
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.dashboard),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.receipt),
+          label: 'Billing',
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.settings),
+          label: 'Settings',
+        ),
+      ],
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Colors.white70,
+      showSelectedLabels: true,
+      showUnselectedLabels: false,
+    );
+  }
+
+  // Helper to get bottom nav index from current page index
+  int _getBottomNavIndex() {
+    // Maps page indices to bottom nav indices
+    // Page order: Dashboard(0), Categories(1), Billing(2), Customers(3), Reports(4), Settings(5)
+    // Bottom nav order: Categories(0), Customers(1), Dashboard(2), Billing(3), Settings(4)
+    const pageToBottomNavMap = {
+      0: 2, // Dashboard -> Home (center)
+      1: 0, // Categories -> Categories
+      2: 3, // Billing -> Billing
+      3: 1, // Customers -> Customers
+      4: -1, // Reports (not in bottom nav)
+      5: 4, // Settings -> Settings
+    };
+    return pageToBottomNavMap[_currentIndex] ?? 2;
+  }
+
+  // ============== DESKTOP LAYOUT ==============
+  Widget _buildDesktopLayout() {
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar
           _buildSidebar(),
-
-          // Main Content
           Expanded(
             child: PageView(
               controller: _pageController,
