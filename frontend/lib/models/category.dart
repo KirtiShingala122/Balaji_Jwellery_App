@@ -27,14 +27,28 @@ class Category {
   }
 
   factory Category.fromMap(Map<String, dynamic> map) {
-    return Category(
-      id: map['id'],
-      name: map['name'],
-      description: map['description'],
-      imagePath: map['imagePath'],
-      createdAt: DateTime.parse(map['createdAt']),
-      updatedAt: DateTime.parse(map['updatedAt']),
-    );
+    print('🔄 Parsing category from map: $map');
+    try {
+      final category = Category(
+        id: map['id'],
+        name: map['name'] ?? '',
+        description: map['description'] ?? '',
+        imagePath: map['imagePath'],
+        createdAt: map['createdAt'] != null
+            ? DateTime.parse(map['createdAt'])
+            : DateTime.now(),
+        updatedAt: map['updatedAt'] != null
+            ? DateTime.parse(map['updatedAt'])
+            : DateTime.now(),
+      );
+      print(
+        '✅ Category parsed: ${category.name}, imagePath: ${category.imagePath}',
+      );
+      return category;
+    } catch (e) {
+      print('❌ Error parsing category: $e');
+      rethrow;
+    }
   }
 
   Category copyWith({

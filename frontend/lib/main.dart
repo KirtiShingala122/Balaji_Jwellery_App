@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -30,11 +31,11 @@ class BalajiImitationApp extends StatelessWidget {
         Size baseSize;
 
         if (constraints.maxWidth <= 600) {
-          baseSize = const Size(390, 844); // 📱 phones
+          baseSize = const Size(390, 844); //  phones
         } else if (constraints.maxWidth <= 1100) {
-          baseSize = const Size(800, 1280); // 💻 tablets
+          baseSize = const Size(800, 1280); // tablets
         } else {
-          baseSize = const Size(1920, 1080); // 🖥️ desktops/laptops
+          baseSize = const Size(1920, 1080); //  desktops/laptops
         }
 
         return ScreenUtilInit(
@@ -46,71 +47,182 @@ class BalajiImitationApp extends StatelessWidget {
               providers: [
                 ChangeNotifierProvider(create: (_) => AuthProvider()),
                 ChangeNotifierProvider(create: (_) => DashboardProvider()),
+                ChangeNotifierProvider(create: (_) => ThemeProvider()),
               ],
-              child: MaterialApp(
-                title: 'Balaji Imitation Admin',
-                debugShowCheckedModeBanner: false,
-                theme: ThemeData(
-                  primarySwatch: Colors.blue,
-                  primaryColor: const Color(0xFF1E3A8A),
-                  colorScheme: ColorScheme.fromSeed(
-                    seedColor: const Color(0xFF1E3A8A),
+              child: Consumer<ThemeProvider>(
+                builder: (context, theme, _) {
+                  // Define colors based on theme
+                  final isDark = theme.themeMode == ThemeMode.dark;
+                  final scaffoldColor = isDark
+                      ? const Color.fromARGB(255, 22, 22, 22)
+                      : Colors.white;
+                  final cardColor = scaffoldColor; // Same for simplicity
+                  final textColor = isDark
+                      ? Colors.white
+                      : Colors.grey.shade800;
+                  final secondaryTextColor = isDark
+                      ? Colors.white70
+                      : Colors.grey.shade600;
+                  final baseLightText = GoogleFonts.poppinsTextTheme();
+                  final lightTheme = ThemeData(
                     brightness: Brightness.light,
-                  ),
-                  textTheme: GoogleFonts.poppinsTextTheme(),
-                  appBarTheme: AppBarTheme(
-                    backgroundColor: const Color(0xFF1E3A8A),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    centerTitle: true,
-                    titleTextStyle: GoogleFonts.poppins(
-                      fontSize: 20.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                    scaffoldBackgroundColor: scaffoldColor,
+                    canvasColor: cardColor,
+                    cardColor: cardColor,
+                    textTheme: baseLightText.apply(
+                      bodyColor: textColor,
+                      displayColor: textColor,
                     ),
-                  ),
-                  elevatedButtonTheme: ElevatedButtonThemeData(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B82F6),
-                      foregroundColor: Colors.white,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
+                    appBarTheme: AppBarTheme(
+                      backgroundColor: cardColor,
+                      foregroundColor: textColor,
+                      elevation: 0,
+                      centerTitle: true,
+                      titleTextStyle: GoogleFonts.poppins(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
+                    ),
+                    elevatedButtonTheme: ElevatedButtonThemeData(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B6F47),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                      ),
+                    ),
+                    inputDecorationTheme: InputDecorationTheme(
+                      filled: true,
+                      fillColor: cardColor,
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
+                        borderSide: BorderSide(
+                          color: secondaryTextColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: BorderSide(
+                          color: secondaryTextColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF8B6F47),
+                          width: 2,
+                        ),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: const BorderSide(color: Colors.red),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: const BorderSide(
+                          color: Colors.red,
+                          width: 2,
+                        ),
+                      ),
+                      labelStyle: TextStyle(color: textColor),
+                      floatingLabelStyle: TextStyle(color: textColor),
+                      hintStyle: TextStyle(color: secondaryTextColor),
+                      prefixIconColor: secondaryTextColor,
+                      suffixIconColor: secondaryTextColor,
+                    ),
+                    iconTheme: IconThemeData(color: textColor),
+                    dividerColor: secondaryTextColor.withValues(alpha: 0.2),
+                  );
+
+                  final darkTheme = ThemeData(
+                    brightness: Brightness.dark,
+                    scaffoldBackgroundColor: scaffoldColor,
+                    canvasColor: cardColor,
+                    cardColor: cardColor,
+                    textTheme: GoogleFonts.poppinsTextTheme(
+                      ThemeData.dark().textTheme.apply(
+                        bodyColor: textColor,
+                        displayColor: textColor,
                       ),
                     ),
-                  ),
-                  inputDecorationTheme: InputDecorationTheme(
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF3B82F6),
-                        width: 2,
+                    appBarTheme: AppBarTheme(
+                      backgroundColor: cardColor,
+                      foregroundColor: textColor,
+                      elevation: 0,
+                      centerTitle: true,
+                      titleTextStyle: GoogleFonts.poppins(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
                       ),
                     ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                      borderSide: const BorderSide(color: Colors.red),
+                    elevatedButtonTheme: ElevatedButtonThemeData(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B6F47),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                      ),
                     ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                      borderSide: const BorderSide(color: Colors.red, width: 2),
+                    inputDecorationTheme: InputDecorationTheme(
+                      filled: true,
+                      fillColor: cardColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: BorderSide(
+                          color: secondaryTextColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: BorderSide(
+                          color: secondaryTextColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF8B6F47),
+                          width: 2,
+                        ),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: const BorderSide(color: Colors.red),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: const BorderSide(
+                          color: Colors.red,
+                          width: 2,
+                        ),
+                      ),
+                      labelStyle: TextStyle(color: textColor),
+                      floatingLabelStyle: TextStyle(color: textColor),
+                      hintStyle: TextStyle(color: secondaryTextColor),
+                      prefixIconColor: secondaryTextColor,
+                      suffixIconColor: secondaryTextColor,
                     ),
-                  ),
-                ),
-                home: const AuthWrapper(),
-                routes: {
-                  '/login': (context) => const LoginScreen(),
-                  '/main': (context) => const MainScreen(),
+                    iconTheme: IconThemeData(color: textColor),
+                    dividerColor: secondaryTextColor.withValues(alpha: 0.2),
+                  );
+
+                  return MaterialApp(
+                    title: 'Balaji Imitation Admin',
+                    debugShowCheckedModeBanner: false,
+                    theme: lightTheme,
+                    darkTheme: darkTheme,
+                    themeMode: theme.themeMode,
+                    home: const AuthWrapper(),
+                    routes: {
+                      '/login': (context) => const LoginScreen(),
+                      '/main': (context) => const MainScreen(),
+                    },
+                  );
                 },
               ),
             );
@@ -152,8 +264,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

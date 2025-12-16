@@ -4,7 +4,7 @@ import '../services/auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
-  
+
   Admin? _currentAdmin;
   bool _isLoading = false;
   String? _errorMessage;
@@ -86,23 +86,63 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> changePassword(String currentPassword, String newPassword) async {
+  Future<bool> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final success = await _authService.changePassword(currentPassword, newPassword);
+      final success = await _authService.changePassword(
+        currentPassword,
+        newPassword,
+      );
       if (success) {
         _currentAdmin = _authService.currentAdmin;
         notifyListeners();
         return true;
       } else {
-        _setError('Failed to change password. Current password may be incorrect.');
+        _setError(
+          'Failed to change password. Current password may be incorrect.',
+        );
         return false;
       }
     } catch (e) {
       _setError('Failed to change password: ${e.toString()}');
       return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<Admin?> updateProfile({
+    required String fullName,
+    required String username,
+    String? email,
+    String? phoneNumber,
+    String? address,
+  }) async {
+    _setLoading(true);
+    _clearError();
+    try {
+      final updated = await _authService.updateProfile(
+        fullName: fullName,
+        username: username,
+        email: email,
+        phoneNumber: phoneNumber,
+        address: address,
+      );
+      if (updated != null) {
+        _currentAdmin = updated;
+        notifyListeners();
+        return updated;
+      }
+      _setError('Failed to update profile');
+      return null;
+    } catch (e) {
+      _setError('Failed to update profile: ${e.toString()}');
+      return null;
     } finally {
       _setLoading(false);
     }

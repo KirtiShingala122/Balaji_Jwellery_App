@@ -7,11 +7,13 @@ const {
     updateProduct,
     deleteProduct,
     getLowStockProducts,
-    upload,
+    upload, 
+    getProductByCode 
 } = require('../controllers/productController');
 
 router.get('/', getAllProducts);
 router.get('/low-stock', getLowStockProducts);
+router.get('/code/:code', getProductByCode);
 router.get('/:id', getProductById);
 router.post('/', upload.single('image'), addProduct);
 router.put('/:id', upload.single('image'), updateProduct);

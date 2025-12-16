@@ -55,6 +55,7 @@ dependencies:
 
   # Permissions
   permission_handler: ^11.3.1
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

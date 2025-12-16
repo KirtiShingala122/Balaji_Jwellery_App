@@ -5,10 +5,12 @@ const {
     getCustomerById,
     addCustomer,
     updateCustomer,
-    deleteCustomer
+    deleteCustomer,
+    searchCustomers,
 } = require('../controllers/customerController');
 
 router.get('/', getAllCustomers);
+router.get('/search', searchCustomers);
 router.get('/:id', getCustomerById);
 router.post('/', addCustomer);
 router.put('/:id', updateCustomer);

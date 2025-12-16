@@ -3,14 +3,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:dio/dio.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
-import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ProductsScreen extends StatefulWidget {
   final Category category;
@@ -25,7 +23,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   List<Product> _products = [];
   bool _isLoading = false;
   String? _errorMessage;
-  String _searchQuery = '';
+  final String _searchQuery = '';
 
   @override
   void initState() {
@@ -38,20 +36,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
-      final allProducts = await _productService.getAllProducts();
-      setState(() {
-        _products = allProducts
-            .where((p) => p.categoryId == widget.category.id)
-            .toList();
-        _isLoading = false;
-      });
+      final all = await _productService.getAllProducts();
+      if (mounted) {
+        setState(() {
+          _products = all
+              .where((p) => p.categoryId == widget.category.id)
+              .toList();
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load products: $e';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load products: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -66,222 +67,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
         .toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFDFBF7),
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(90.h),
-        child: SafeArea(child: _buildHeader(context)),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                ? _buildError()
-                : _buildGrid(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDECEF),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF0B132B),
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          Text(
-            "${widget.category.name} Products",
-            style: GoogleFonts.poppins(
-              fontSize: 24.sp,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF0B132B),
-            ),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: 280.w,
-            child: TextField(
-              onChanged: (v) => setState(() => _searchQuery = v),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                hintText: 'Search products...',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          CustomButton(
-            text: 'Add Product',
-            icon: Icons.add,
-            backgroundColor: const Color(0xFF0B132B),
-            onPressed: _showAddProductDialog,
-            width: 150.w,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError() => Center(
-    child: Text(
-      _errorMessage ?? "Error loading products",
-      style: GoogleFonts.poppins(color: Colors.red, fontSize: 16.sp),
-    ),
-  );
-
-  Widget _buildGrid() {
-    final filtered = _filteredProducts;
-    if (filtered.isEmpty) {
-      return Center(
-        child: Text(
-          "No products found",
-          style: GoogleFonts.poppins(color: Colors.grey, fontSize: 18.sp),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: EdgeInsets.all(20.w),
-      child: GridView.builder(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _getCrossAxisCount(),
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.2,
-        ),
-        itemCount: filtered.length,
-        itemBuilder: (context, index) =>
-            _buildProductCard(filtered[index], index),
-      ),
-    );
-  }
-
-  int _getCrossAxisCount() {
-    final width = MediaQuery.of(context).size.width;
-    if (width > 1200) return 4;
-    if (width > 800) return 3;
-    return 2;
-  }
-
-  Widget _buildProductCard(Product p, int index) {
-    return Card(
-      color: Colors.white,
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (p.imagePath != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  "http://localhost:3000${p.imagePath}",
-                  height: 100,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, _, __) => Container(
-                    color: Colors.grey.shade200,
-                    height: 100,
-                    child: const Icon(
-                      Icons.broken_image,
-                      color: Colors.grey,
-                      size: 40,
-                    ),
-                  ),
-                ),
-              ),
-            SizedBox(height: 8.h),
-            Text(
-              p.name,
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-                fontSize: 18.sp,
-                color: const Color(0xFF0B132B),
-              ),
-            ),
-            Text(
-              p.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(fontSize: 12.sp, color: Colors.grey),
-            ),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "₹${p.price}",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFFE43D60),
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => _showProductDialog(product: p),
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                    ),
-                    IconButton(
-                      onPressed: () => _deleteProduct(p.id!),
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<Uint8List?> _pickImageUniversal() async {
+  Future<Uint8List?> _pickImage() async {
     if (kIsWeb) {
-      final result = await FilePicker.platform.pickFiles(type: FileType.image);
-      if (result == null) return null;
-      return result.files.single.bytes;
+      final res = await FilePicker.platform.pickFiles(type: FileType.image);
+      return res?.files.single.bytes;
     } else {
-      final XFile? image = await ImagePicker().pickImage(
+      final XFile? file = await ImagePicker().pickImage(
         source: ImageSource.gallery,
       );
-      if (image == null) return null;
-      return await image.readAsBytes();
+      return await file?.readAsBytes();
     }
   }
 
-  void _showAddProductDialog() => _showProductDialog();
-
   void _showProductDialog({Product? product}) {
-    final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: product?.name ?? '');
     final descController = TextEditingController(
       text: product?.description ?? '',
@@ -295,185 +93,460 @@ class _ProductsScreenState extends State<ProductsScreen> {
     final codeController = TextEditingController(
       text: product?.uniqueCode ?? '',
     );
-
+    final formKey = GlobalKey<FormState>();
     Uint8List? imageBytes;
+    bool saving = false;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          product == null ? "Add Product" : "Edit Product",
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setStateModal) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.86,
+                  padding: EdgeInsets.all(18.w),
+                  child: Column(
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 80.w,
+                          height: 6.h,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).dividerColor,
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        product == null ? 'Add Product' : 'Edit Product',
+                        style: GoogleFonts.roboto(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[800]
+                              : Theme.of(context).textTheme.titleLarge?.color,
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      GestureDetector(
+                        onTap: () async {
+                          final b = await _pickImage();
+                          if (b != null) setStateModal(() => imageBytes = b);
+                        },
+                        child: Container(
+                          height: 160.h,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12.r),
+                            color: Theme.of(context).cardColor,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12.r),
+                            child: imageBytes != null
+                                ? Image.memory(imageBytes!, fit: BoxFit.cover)
+                                : (product?.imagePath != null
+                                      ? Image.network(
+                                          "http://localhost:3000${product!.imagePath}",
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Center(
+                                          child: Icon(
+                                            Icons.add_a_photo,
+                                            size: 36.sp,
+                                            color:
+                                                Theme.of(context).brightness ==
+                                                    Brightness.light
+                                                ? Colors.grey[600]
+                                                : Theme.of(context)
+                                                      .iconTheme
+                                                      .color
+                                                      ?.withValues(alpha: 0.7),
+                                          ),
+                                        )),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Form(
+                            key: formKey,
+                            child: Column(
+                              children: [
+                                CustomTextField(
+                                  controller: nameController,
+                                  labelText: 'Product Name',
+                                  prefixIcon: Icons.label,
+                                  validator: (v) =>
+                                      v!.isEmpty ? 'Enter product name' : null,
+                                ),
+                                SizedBox(height: 10.h),
+                                CustomTextField(
+                                  controller: descController,
+                                  labelText: 'Description',
+                                  prefixIcon: Icons.description,
+                                  maxLines: 2,
+                                  validator: (v) =>
+                                      v!.isEmpty ? 'Enter description' : null,
+                                ),
+                                SizedBox(height: 10.h),
+                                CustomTextField(
+                                  controller: codeController,
+                                  labelText: '5-digit Product Code',
+                                  prefixIcon: Icons.qr_code,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) {
+                                      return 'Enter code';
+                                    }
+                                    if (v.length != 5) {
+                                      return 'Must be 5 digits';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: 10.h),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: CustomTextField(
+                                        controller: priceController,
+                                        labelText: 'Price',
+                                        prefixIcon: Icons.currency_rupee,
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: CustomTextField(
+                                        controller: stockController,
+                                        labelText: 'Stock',
+                                        keyboardType: TextInputType.number,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 18.h),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text('Cancel'),
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: saving
+                                  ? null
+                                  : () async {
+                                      if (!formKey.currentState!.validate()) {
+                                        return;
+                                      }
+                                      setStateModal(() => saving = true);
+                                      try {
+                                        if (product == null) {
+                                          final newP = Product(
+                                            id: 0,
+                                            uniqueCode: codeController.text
+                                                .trim(),
+                                            name: nameController.text.trim(),
+                                            description: descController.text
+                                                .trim(),
+                                            categoryId: widget.category.id!,
+                                            price: double.parse(
+                                              priceController.text,
+                                            ),
+                                            stockQuantity: int.parse(
+                                              stockController.text,
+                                            ),
+                                            createdAt: DateTime.now(),
+                                            updatedAt: DateTime.now(),
+                                          );
+                                          await _productService.addProduct(
+                                            newP,
+                                            webImage: imageBytes,
+                                          );
+                                        } else {
+                                          final updated = product.copyWith(
+                                            uniqueCode: codeController.text
+                                                .trim(),
+                                            name: nameController.text.trim(),
+                                            description: descController.text
+                                                .trim(),
+                                            price: double.parse(
+                                              priceController.text,
+                                            ),
+                                            stockQuantity: int.parse(
+                                              stockController.text,
+                                            ),
+                                            updatedAt: DateTime.now(),
+                                          );
+                                          await _productService.updateProduct(
+                                            updated,
+                                            webImage: imageBytes,
+                                          );
+                                        }
+                                        if (mounted) {
+                                          Navigator.pop(context);
+                                          await _loadProductsByCategory();
+                                        }
+                                      } catch (e) {
+                                        setStateModal(() => saving = false);
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                      }
+                                    },
+                              child: saving
+                                  ? SizedBox(
+                                      height: 18.h,
+                                      width: 18.h,
+                                      child: CircularProgressIndicator(
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.light
+                                            ? const Color(0xFF8B6F47)
+                                            : Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(product == null ? 'Add' : 'Update'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteProduct(Product p) async {
+    try {
+      await _productService.deleteProduct(p.id!);
+      await _loadProductsByCategory();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Widget _buildGridItem(Product p) {
+    return GestureDetector(
+      onTap: () {},
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12.r),
+          color: Theme.of(context).cardColor,
+          boxShadow: Theme.of(context).brightness == Brightness.light
+              ? [
+                  BoxShadow(
+                    color: Colors.grey.shade600.withValues(alpha: 0.5),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                CustomTextField(
-                  controller: nameController,
-                  labelText: "Product Name",
-                  prefixIcon: Icons.label,
-                  validator: (v) => v!.isEmpty ? "Enter product name" : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12.r),
+                  topRight: Radius.circular(12.r),
                 ),
-                SizedBox(height: 10.h),
-                CustomTextField(
-                  controller: descController,
-                  labelText: "Description",
-                  prefixIcon: Icons.description,
-                  maxLines: 2,
-                  validator: (v) => v!.isEmpty ? "Enter description" : null,
-                ),
-                SizedBox(height: 10.h),
-                CustomTextField(
-                  controller: codeController,
-                  labelText: "5-digit Product Code",
-                  prefixIcon: Icons.qr_code,
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return "Enter product code";
-                    if (v.length != 5) return "Code must be 5 digits";
-                    return null;
-                  },
-                ),
-                SizedBox(height: 10.h),
-                GestureDetector(
-                  onTap: () async {
-                    final bytes = await _pickImageUniversal();
-                    if (bytes != null) setState(() => imageBytes = bytes);
-                  },
-                  child: _buildImagePreview(imageBytes, product),
-                ),
-                SizedBox(height: 10.h),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CustomTextField(
-                        controller: priceController,
-                        labelText: "Price",
-                        prefixIcon: Icons.currency_rupee,
-                        keyboardType: TextInputType.number,
+                child: p.imagePath != null
+                    ? Image.network(
+                        "http://localhost:3000${p.imagePath}",
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      )
+                    : Container(
+                        color: Theme.of(context).cardColor,
+                        child: Center(
+                          child: Icon(
+                            Icons.diamond_outlined,
+                            size: 36.sp,
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                ? Colors.grey[800]!.withValues(alpha: 0.7)
+                                : Theme.of(context).textTheme.bodyMedium?.color
+                                      ?.withValues(alpha: 0.7),
+                          ),
+                        ),
                       ),
-                    ),
-                    SizedBox(width: 8.w),
-                    Expanded(
-                      child: CustomTextField(
-                        controller: stockController,
-                        labelText: "Stock",
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
+            Padding(
+              padding: EdgeInsets.all(10.w),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    p.name,
+                    style: GoogleFonts.roboto(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[800]
+                          : Colors.white,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 6.h),
+                  Text(
+                    'Code: ${p.uniqueCode}',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[600]
+                          : Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                  ),
+                  SizedBox(height: 6.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '₹ ${p.price.toStringAsFixed(2)}',
+                        style: GoogleFonts.roboto(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF8B6F47),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        color: Theme.of(context).cardColor,
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: Theme.of(context).iconTheme.color,
+                        ),
+                        onSelected: (v) {
+                          if (v == 'edit') _showProductDialog(product: p);
+                          if (v == 'delete') _deleteProduct(p);
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Text(
+                              'Edit',
+                              style: GoogleFonts.inter(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge?.color,
+                              ),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              'Delete',
+                              style: GoogleFonts.inter(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge?.color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        title: Text(
+          widget.category.name,
+          style: GoogleFonts.roboto(
+            color: Theme.of(context).appBarTheme.foregroundColor,
+            fontSize: 22.sp,
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          CustomButton(
-            text: product == null ? "Add" : "Update",
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-
-              final newProduct = Product(
-                id: product?.id ?? 0,
-                uniqueCode: codeController.text.trim(),
-                name: nameController.text.trim(),
-                description: descController.text.trim(),
-                categoryId: widget.category.id!,
-                price: double.parse(priceController.text),
-                stockQuantity: int.parse(stockController.text),
-                createdAt: product?.createdAt ?? DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-
-              try {
-                await _uploadProduct(newProduct, imageBytes, product != null);
-                if (mounted) {
-                  Navigator.pop(context);
-                  _loadProductsByCategory();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        product == null
-                            ? "Product Added Successfully"
-                            : "Product Updated Successfully",
-                      ),
-                    ),
-                  );
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text("Error: $e")));
-              }
-            },
-            backgroundColor: const Color(0xFF0B132B),
-          ),
-        ],
+        iconTheme: IconThemeData(
+          color: Theme.of(context).appBarTheme.foregroundColor,
+        ),
+        centerTitle: true,
+      ),
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).iconTheme.color,
+              ),
+            )
+          : _errorMessage != null
+          ? Center(child: Text(_errorMessage!))
+          : Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              child: GridView.builder(
+                itemCount: _filteredProducts.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.68,
+                  crossAxisSpacing: 12.w,
+                  mainAxisSpacing: 14.h,
+                ),
+                itemBuilder: (ctx, i) {
+                  return _buildGridItem(_filteredProducts[i]);
+                },
+              ),
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showProductDialog(),
+        backgroundColor: const Color(0xFF8B6F47),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      bottomNavigationBar: Container(
+        height: 80.h,
+        color: Theme.of(context).scaffoldBackgroundColor,
+        child: Center(
+          child: Text(
+            '',
+          ), // keep bottom bar simple; your main app likely draws nav elsewhere
+        ),
       ),
     );
-  }
-
-  Widget _buildImagePreview(Uint8List? bytes, Product? product) {
-    if (bytes != null) {
-      return Image.memory(bytes, height: 120, fit: BoxFit.cover);
-    }
-    if (product?.imagePath != null) {
-      return Image.network(
-        "http://localhost:3000${product!.imagePath}",
-        height: 120,
-        fit: BoxFit.cover,
-      );
-    }
-    return Container(
-      height: 120,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade400),
-      ),
-      child: const Center(child: Icon(Icons.camera_alt, color: Colors.grey)),
-    );
-  }
-
-  Future<void> _uploadProduct(
-    Product product,
-    Uint8List? imageBytes,
-    bool isUpdate,
-  ) async {
-    final dio = Dio();
-    final url = isUpdate
-        ? "http://localhost:3000/api/products/${product.id}"
-        : "http://localhost:3000/api/products";
-
-    final formData = FormData.fromMap({
-      "uniqueCode": product.uniqueCode,
-      "name": product.name,
-      "description": product.description,
-      "categoryId": product.categoryId.toString(),
-      "price": product.price.toString(),
-      "stockQuantity": product.stockQuantity.toString(),
-      if (imageBytes != null)
-        "image": MultipartFile.fromBytes(imageBytes, filename: "product.jpg"),
-    });
-
-    if (isUpdate) {
-      await dio.put(url, data: formData);
-    } else {
-      await dio.post(url, data: formData);
-    }
-  }
-
-  Future<void> _deleteProduct(int id) async {
-    await _productService.deleteProduct(id);
-    _loadProductsByCategory();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Product deleted")));
   }
 }

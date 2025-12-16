@@ -44,16 +44,16 @@ class Bill {
   factory Bill.fromMap(Map<String, dynamic> map) {
     return Bill(
       id: map['id'],
-      billNumber: map['billNumber'],
-      customerId: map['customerId'],
-      subtotal: map['subtotal'].toDouble(),
-      taxAmount: map['taxAmount'].toDouble(),
-      discountAmount: map['discountAmount'].toDouble(),
-      totalAmount: map['totalAmount'].toDouble(),
-      billDate: DateTime.parse(map['billDate']),
-      paymentStatus: map['paymentStatus'],
+      billNumber: map['billNumber'] ?? '',
+      customerId: map['customerId'] ?? 0,
+      subtotal: _toDouble(map['subtotal']),
+      taxAmount: _toDouble(map['taxAmount']),
+      discountAmount: _toDouble(map['discountAmount']),
+      totalAmount: _toDouble(map['totalAmount']),
+      billDate: _toDate(map['billDate']),
+      paymentStatus: map['paymentStatus'] ?? 'pending',
       notes: map['notes'],
-      createdAt: DateTime.parse(map['createdAt']),
+      createdAt: _toDate(map['createdAt']),
     );
   }
 
@@ -84,6 +84,21 @@ class Bill {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+}
+
+double _toDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0.0;
+}
+
+DateTime _toDate(dynamic value) {
+  if (value == null) return DateTime.now();
+  return DateTime.tryParse(value.toString()) ?? DateTime.now();
+}
+
+int _toInt(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 class BillItem {
@@ -117,11 +132,11 @@ class BillItem {
   factory BillItem.fromMap(Map<String, dynamic> map) {
     return BillItem(
       id: map['id'],
-      billId: map['billId'],
-      productId: map['productId'],
-      quantity: map['quantity'],
-      unitPrice: map['unitPrice'].toDouble(),
-      totalPrice: map['totalPrice'].toDouble(),
+      billId: map['billId'] ?? 0,
+      productId: map['productId'] ?? 0,
+      quantity: _toInt(map['quantity']),
+      unitPrice: _toDouble(map['unitPrice']),
+      totalPrice: _toDouble(map['totalPrice']),
     );
   }
 }

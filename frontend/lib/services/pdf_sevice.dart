@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/bill.dart';
 import '../models/customer.dart';
 import '../models/product.dart';
@@ -294,9 +296,33 @@ class PDFService {
 
   Future<String> saveBillPDF(Bill bill, List<BillItem> billItems) async {
     final pdfBytes = await generateBillPDF(bill, billItems);
+
+    // On web, saving to a device path is not supported; trigger a download/share instead.
+    if (kIsWeb) {
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'bill_${bill.billNumber}.pdf',
+      );
+      return 'downloaded';
+    }
+
     final directory = await getApplicationDocumentsDirectory();
     final file = File('${directory.path}/bill_${bill.billNumber}.pdf');
     await file.writeAsBytes(pdfBytes);
     return file.path;
+  }
+
+  Future<void> shareBill(Bill bill, List<BillItem> billItems) async {
+    final pdfBytes = await generateBillPDF(bill, billItems);
+
+    // Use the platform share sheet (e.g., WhatsApp, Gmail) via share_plus.
+    // On web, this will use the Web Share API if available; otherwise it may fall back gracefully.
+    final fileName = 'bill_${bill.billNumber}.pdf';
+    final xFile = XFile.fromData(
+      pdfBytes,
+      name: fileName,
+      mimeType: 'application/pdf',
+    );
+    await Share.shareXFiles([xFile], text: 'Invoice ${bill.billNumber}');
   }
 }

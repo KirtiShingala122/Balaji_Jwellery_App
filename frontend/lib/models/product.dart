@@ -4,6 +4,7 @@ class Product {
   final String name;
   final String description;
   final int categoryId;
+  final String? categoryName;
   final double price;
   final int stockQuantity;
   final String? imagePath;
@@ -16,6 +17,7 @@ class Product {
     required this.name,
     required this.description,
     required this.categoryId,
+    this.categoryName,
     required this.price,
     required this.stockQuantity,
     this.imagePath,
@@ -30,6 +32,7 @@ class Product {
       'name': name,
       'description': description,
       'categoryId': categoryId,
+      'categoryName': categoryName,
       'price': price,
       'stockQuantity': stockQuantity,
       'imagePath': imagePath,
@@ -45,6 +48,7 @@ class Product {
       name: map['name'] ?? '',
       description: map['description'] ?? '',
       categoryId: map['categoryId'] ?? 0,
+      categoryName: map['categoryName'],
 
       // ✅ Safe parsing for price (handles string or number)
       price: map['price'] is num
@@ -76,6 +80,7 @@ class Product {
     int? categoryId,
     double? price,
     int? stockQuantity,
+    String? categoryName,
     String? imagePath,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -86,6 +91,7 @@ class Product {
       name: name ?? this.name,
       description: description ?? this.description,
       categoryId: categoryId ?? this.categoryId,
+      categoryName: categoryName ?? this.categoryName,
       price: price ?? this.price,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       imagePath: imagePath ?? this.imagePath,

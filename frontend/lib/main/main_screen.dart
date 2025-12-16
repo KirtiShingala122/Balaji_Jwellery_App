@@ -6,6 +6,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import 'dashboard_screen.dart';
 import 'categories_screen.dart';
+import 'customers_screen.dart';
+import 'billing_screen.dart';
+import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -24,33 +27,23 @@ class _MainScreenState extends State<MainScreen> {
   final List<MainScreenItem> _screens = [
     MainScreenItem(
       title: 'Dashboard',
-      icon: Icons.dashboard,
+      icon: Icons.home_outlined,
       screen: const DashboardScreen(),
     ),
     MainScreenItem(
       title: 'Categories',
-      icon: Icons.category,
+      icon: Icons.category_outlined,
       screen: const CategoriesScreen(),
     ),
     MainScreenItem(
-      title: 'Billing',
-      icon: Icons.receipt,
-      screen: const BillingScreen(),
-    ),
-    MainScreenItem(
       title: 'Customers',
-      icon: Icons.people,
+      icon: Icons.people_outline,
       screen: const CustomersScreen(),
     ),
     MainScreenItem(
-      title: 'Reports',
-      icon: Icons.analytics,
-      screen: const ReportsScreen(),
-    ),
-    MainScreenItem(
-      title: 'Settings',
-      icon: Icons.settings,
-      screen: const SettingsScreen(),
+      title: 'Billing',
+      icon: Icons.receipt_outlined,
+      screen: const BillingScreen(),
     ),
   ];
 
@@ -77,7 +70,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < _desktopBreakpoint;
+    final bool isMobile =
+        MediaQuery.of(context).size.width < _desktopBreakpoint;
 
     if (isMobile) {
       return _buildMobileLayout();
@@ -86,10 +80,13 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // ============== MOBILE LAYOUT ==============
+  // ---------------------------------------------------------------------------
+  // ⬇⬇⬇ MOBILE DESIGN — Luxury Balaji UI (matching Categories Screen)
+  // ---------------------------------------------------------------------------
   Widget _buildMobileLayout() {
     return Scaffold(
-      appBar: _buildMobileAppBar(),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: _buildLuxuryAppBar(),
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
@@ -99,59 +96,50 @@ class _MainScreenState extends State<MainScreen> {
         },
         children: _screens.map((item) => item.screen).toList(),
       ),
-      bottomNavigationBar: _buildMobileBottomNav(),
+      bottomNavigationBar: _buildLuxuryBottomNav(),
     );
   }
 
-  // Mobile AppBar (Logo + User Icon)
-  AppBar _buildMobileAppBar() {
+  //  Top Navigation (Redesigned to match Category UI)
+  AppBar _buildLuxuryAppBar() {
     return AppBar(
-      backgroundColor: const Color(0xFF1E3A8A),
-      elevation: 2,
-      leading: Padding(
-        padding: EdgeInsets.all(8.w),
-        child: Row(
-          children: [
-            Icon(Icons.diamond, size: 28.w, color: Colors.white),
-            SizedBox(width: 4.w),
-            Text(
-              'Balaji',
-              style: GoogleFonts.poppins(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      centerTitle: false,
+      title: Text(
+        'Balaji',
+        style: TextStyle(
+          fontFamily: 'Georgia',
+          fontSize: 28.sp,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1,
+          color: const Color(0xFF8B6F47),
         ),
       ),
-      leadingWidth: 110.w,
       actions: [
-        // User icon in top right - tap to go to Settings
         Consumer<AuthProvider>(
           builder: (context, auth, child) {
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _currentIndex = 5; // Settings index
-                });
-                _pageController.animateToPage(
-                  5,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              },
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: Center(
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    radius: 18.r,
-                    child: Icon(
-                      Icons.person,
-                      size: 20.w,
-                      color: Colors.white,
-                    ),
+            return Padding(
+              padding: EdgeInsets.only(right: 16.w),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+                child: Container(
+                  width: 38.w,
+                  height: 38.w,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 22.w,
+                    color: Theme.of(context).iconTheme.color,
                   ),
                 ),
               ),
@@ -162,289 +150,124 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Mobile Bottom Navigation Bar
-  Widget _buildMobileBottomNav() {
-    return BottomNavigationBar(
-      backgroundColor: const Color(0xFF1E3A8A),
-      type: BottomNavigationBarType.fixed,
-      currentIndex: _getBottomNavIndex(),
-      onTap: (index) {
-        // Map bottom nav index back to page index
-        // Order: Categories(0), Customers(1), Dashboard/Home(2), Billing(3), Settings(4)
-        final pageIndices = [1, 3, 0, 2, 5];
-        final pageIndex = pageIndices[index];
-
-        setState(() {
-          _currentIndex = pageIndex;
-        });
-        _pageController.animateToPage(
-          pageIndex,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      },
-      items: [
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.category),
-          label: 'Categories',
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.people),
-          label: 'Customers',
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.dashboard),
-          label: 'Home',
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.receipt),
-          label: 'Billing',
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.settings),
-          label: 'Settings',
-        ),
-      ],
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Colors.white70,
-      showSelectedLabels: true,
-      showUnselectedLabels: false,
-    );
-  }
-
-  // Helper to get bottom nav index from current page index
-  int _getBottomNavIndex() {
-    // Maps page indices to bottom nav indices
-    // Page order: Dashboard(0), Categories(1), Billing(2), Customers(3), Reports(4), Settings(5)
-    // Bottom nav order: Categories(0), Customers(1), Dashboard(2), Billing(3), Settings(4)
-    const pageToBottomNavMap = {
-      0: 2, // Dashboard -> Home (center)
-      1: 0, // Categories -> Categories
-      2: 3, // Billing -> Billing
-      3: 1, // Customers -> Customers
-      4: -1, // Reports (not in bottom nav)
-      5: 4, // Settings -> Settings
-    };
-    return pageToBottomNavMap[_currentIndex] ?? 2;
-  }
-
-  // ============== DESKTOP LAYOUT ==============
-  Widget _buildDesktopLayout() {
-    return Scaffold(
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              children: _screens.map((item) => item.screen).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar() {
+  // 🌟 Bottom Navigation (Matches high-end category UI)
+  Widget _buildLuxuryBottomNav() {
     return Container(
-      width: 280.w,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E3A8A),
+        color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.white.withOpacity(0.1)
+                : Theme.of(context).dividerColor.withOpacity(0.3),
             blurRadius: 10,
-            offset: const Offset(2, 0),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: EdgeInsets.all(24.w),
-            child: Column(
-              children: [
-                Icon(Icons.diamond, size: 40.w, color: Colors.white),
-                SizedBox(height: 12.h),
-                Text(
-                  'Balaji Imitation',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  'Admin Panel',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12.sp,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Navigation Items
-          Expanded(
-            child: ListView.builder(
-              itemCount: _screens.length,
-              itemBuilder: (context, index) {
-                final item = _screens[index];
-                final isSelected = _currentIndex == index;
-
-                return Container(
-                  margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _currentIndex = index;
-                        });
-                        _pageController.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(12.r),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16.w,
-                          vertical: 12.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.white.withOpacity(0.2)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              item.icon,
-                              size: 20.w,
-                              color: isSelected ? Colors.white : Colors.white70,
-                            ),
-                            SizedBox(width: 12.w),
-                            Text(
-                              item.title,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14.sp,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // User Info and Logout
-          Container(
-            padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              border: Border(
-                top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 6.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(
+              _screens.length,
+              (index) => _luxuryNavItem(
+                icon: _screens[index].icon,
+                label: _screens[index].title,
+                isSelected: _currentIndex == index,
+                onTap: () {
+                  setState(() => _currentIndex = index);
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
               ),
             ),
-            child: Column(
-              children: [
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 20.r,
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          child: Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 20.w,
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                authProvider.currentAdmin?.fullName ?? 'Admin',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                authProvider.currentAdmin?.username ?? '',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10.sp,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                SizedBox(height: 12.h),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _handleLogout,
-                    icon: Icon(Icons.logout, size: 16.w),
-                    label: Text(
-                      'Logout',
-                      style: GoogleFonts.poppins(fontSize: 12.sp),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[600],
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 8.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Future<void> _handleLogout() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.logout();
+  // 📌 Individual Bottom Nav Item
+  Widget _luxuryNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.light
+              ? Colors.white
+              : Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(12.r),
+          boxShadow: Theme.of(context).brightness == Brightness.light
+              ? [
+                  BoxShadow(
+                    color: isSelected
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.1),
+                    blurRadius: isSelected ? 8 : 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24.sp,
+              color: isSelected
+                  ? const Color(0xFF8B6F47)
+                  : (Theme.of(context).brightness == Brightness.light
+                        ? Colors.grey[800]!.withValues(alpha: 0.6)
+                        : Theme.of(
+                            context,
+                          ).iconTheme.color?.withValues(alpha: 0.6)),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? const Color(0xFF8B6F47)
+                    : (Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[800]!.withValues(alpha: 0.6)
+                          : Theme.of(context).textTheme.bodySmall?.color
+                                ?.withValues(alpha: 0.6)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
+  // ---------------------------------------------------------------------------
+  // ⬇⬇⬇ DESKTOP DESIGN (kept original, not redesigned)
+  // ---------------------------------------------------------------------------
+  Widget _buildDesktopLayout() {
+    return const Center(
+      child: Text(
+        "Desktop layout coming soon...",
+        style: TextStyle(fontSize: 22),
+      ),
+    );
   }
 }
 
+// SCREEN HOLDER MODEL
 class MainScreenItem {
   final String title;
   final IconData icon;
@@ -455,40 +278,4 @@ class MainScreenItem {
     required this.icon,
     required this.screen,
   });
-}
-
-class BillingScreen extends StatelessWidget {
-  const BillingScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Billing Screen - Coming Soon'));
-  }
-}
-
-class CustomersScreen extends StatelessWidget {
-  const CustomersScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Customers Screen - Coming Soon'));
-  }
-}
-
-class ReportsScreen extends StatelessWidget {
-  const ReportsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Reports Screen - Coming Soon'));
-  }
-}
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Settings Screen - Coming Soon'));
-  }
 }

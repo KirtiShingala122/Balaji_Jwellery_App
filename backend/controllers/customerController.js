@@ -8,6 +8,30 @@ exports.getAllCustomers = (req, res) => {
     });
 };
 
+// Search customers by name or phone (case-insensitive)
+exports.searchCustomers = (req, res) => {
+    const { q } = req.query;
+    if (!q || !q.trim()) {
+        // Fallback to full list if no query provided
+        return exports.getAllCustomers(req, res);
+    }
+
+    const term = `%${q.trim()}%`;
+    const sql = `
+      SELECT *
+      FROM customers
+      WHERE LOWER(name) LIKE LOWER(?)
+         OR phoneNumber LIKE ?
+      ORDER BY id DESC
+      LIMIT 25
+    `;
+
+    db.query(sql, [term, term], (err, results) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        res.json(results);
+    });
+};
+
 // Get customer by ID
 exports.getCustomerById = (req, res) => {
     const { id } = req.params;

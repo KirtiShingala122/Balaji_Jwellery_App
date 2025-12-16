@@ -174,4 +174,21 @@ class ProductService {
       throw Exception("Error deleting product: $e");
     }
   }
+
+  /// Get product by unique code
+  Future<Product?> getProductByCode(String code) async {
+    try {
+      final res = await http.get(Uri.parse("$baseUrl/code/$code"));
+
+      if (res.statusCode == 200) {
+        return Product.fromMap(jsonDecode(res.body));
+      } else if (res.statusCode == 404) {
+        return null;
+      } else {
+        throw Exception('Failed to fetch product (${res.statusCode})');
+      }
+    } catch (e) {
+      throw Exception('Error fetching product by code: $e');
+    }
+  }
 }
