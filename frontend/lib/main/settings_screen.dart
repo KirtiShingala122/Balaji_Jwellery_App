@@ -1,3 +1,4 @@
+//setting_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -90,7 +91,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ? const Color.fromARGB(255, 42, 43, 44)
         : lightSurface;
     final Color textPrimary = isDark ? Colors.white : Colors.grey[800]!;
-    final Color textSecondary = isDark ? Colors.white70 : Colors.grey[600]!;
 
     return Scaffold(
       backgroundColor: surface,

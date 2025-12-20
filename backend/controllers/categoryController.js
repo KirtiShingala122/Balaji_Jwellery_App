@@ -95,8 +95,17 @@ exports.updateCategory = (req, res) => {
 // Delete category
 exports.deleteCategory = (req, res) => {
     const { id } = req.params;
-    db.query('DELETE FROM categories WHERE id = ?', [id], (err, result) => {
-        if (err) return res.status(500).json({ error: 'Failed to delete category' });
-        res.json({ message: 'Category deleted successfully' });
+    // Check for products in this category to avoid breaking foreign keys
+    db.query('SELECT COUNT(*) AS cnt FROM products WHERE categoryId = ?', [id], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Failed to check category products' });
+        const cnt = rows[0].cnt || 0;
+        if (cnt > 0) {
+            return res.status(400).json({ error: 'Category has products. Remove products first or delete them before deleting the category.' });
+        }
+
+        db.query('DELETE FROM categories WHERE id = ?', [id], (err, result) => {
+            if (err) return res.status(500).json({ error: 'Failed to delete category' });
+            res.json({ message: 'Category deleted successfully' });
+        });
     });
 };

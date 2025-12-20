@@ -3,8 +3,9 @@ const db = require('../db');
 //  Helper: generate next bill number
 const getNextBillNumber = () => {
     return new Promise((resolve, reject) => {
+        // Use SUBSTRING_INDEX to support both "BILL-0001" and "BILL0001" formats.
         const sql = `
-      SELECT IFNULL(MAX(CAST(SUBSTRING(billNumber, 5) AS UNSIGNED)), 0) + 1 AS next
+      SELECT IFNULL(MAX(CAST(SUBSTRING_INDEX(billNumber, '-', -1) AS UNSIGNED)), 0) + 1 AS next
       FROM bills
     `;
         db.query(sql, (err, result) => {
@@ -152,6 +153,51 @@ exports.addBill = async (req, res) => {
                     billId,
                     billNumber,
                 });
+            });
+        } catch (e) {
+            db.rollback(() => {
+                res.status(400).json({ error: e.message });
+            });
+        }
+    });
+};
+
+// Delete bill and restore stock
+exports.deleteBill = (req, res) => {
+    const billId = req.params.id;
+
+    db.beginTransaction(async (err) => {
+        if (err) return res.status(500).json({ error: 'Transaction failed' });
+
+        try {
+            // Fetch bill items
+            const items = await new Promise((resolve, reject) => {
+                db.query('SELECT productId, quantity FROM bill_items WHERE billId = ?', [billId], (err, rows) => (err ? reject(err) : resolve(rows)));
+            });
+
+            // Restore product stock for each item
+            for (const it of items) {
+                await new Promise((resolve, reject) => {
+                    db.query(
+                        `UPDATE products SET stockQuantity = stockQuantity + ? WHERE id = ?`,
+                        [it.quantity, it.productId],
+                        (err) => (err ? reject(err) : resolve())
+                    );
+                });
+            }
+
+            // Delete bill items
+            await new Promise((resolve, reject) => {
+                db.query('DELETE FROM bill_items WHERE billId = ?', [billId], (err) => (err ? reject(err) : resolve()));
+            });
+
+            // Delete bill
+            await new Promise((resolve, reject) => {
+                db.query('DELETE FROM bills WHERE id = ?', [billId], (err, result) => (err ? reject(err) : resolve(result)));
+            });
+
+            db.commit(() => {
+                res.json({ message: 'Bill deleted' });
             });
         } catch (e) {
             db.rollback(() => {

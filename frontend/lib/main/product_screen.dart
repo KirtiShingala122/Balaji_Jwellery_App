@@ -352,9 +352,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
       await _productService.deleteProduct(p.id!);
       await _loadProductsByCategory();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      final s = e.toString();
+      final lower = s.toLowerCase();
+
+      // If backend returned a 400 referencing bill items, show a clear message
+      if (s.contains('API_ERROR:400') || lower.contains('referenc')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You cannot delete this product because you used it in bills',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -518,6 +532,28 @@ class _ProductsScreenState extends State<ProductsScreen> {
             )
           : _errorMessage != null
           ? Center(child: Text(_errorMessage!))
+          : _filteredProducts.isEmpty
+          ? Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.w),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 64.sp,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'No products in this category. Tap + to add products.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               child: GridView.builder(

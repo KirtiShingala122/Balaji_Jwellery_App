@@ -688,6 +688,28 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         style: GoogleFonts.inter(color: Colors.red),
                       ),
                     )
+                  : _filteredCategories.isEmpty
+                  ? Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.w),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.category_outlined,
+                              size: 64.sp,
+                              color: Colors.grey[400],
+                            ),
+                            SizedBox(height: 12.h),
+                            Text(
+                              'No categories yet. Tap + to add categories.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(color: Colors.grey[700]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : ListView.builder(
                       padding: EdgeInsets.only(
                         top: 12.h,
