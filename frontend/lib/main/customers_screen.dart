@@ -429,12 +429,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: Colors.white),
+        Icon(
+          icon,
+          color: Theme.of(context).brightness == Brightness.light
+              ? Colors.grey[800]
+              : Colors.white,
+        ),
         SizedBox(width: 10.w),
         Expanded(
           child: Text(
             text,
-            style: GoogleFonts.inter(fontSize: 14.sp, color: Colors.white70),
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Colors.grey[700]
+                  : Colors.white70,
+            ),
           ),
         ),
       ],

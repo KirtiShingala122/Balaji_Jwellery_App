@@ -87,4 +87,11 @@ class BillService {
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
+
+  Future<void> deleteBill(int id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/$id'));
+    if (res.statusCode != 200) {
+      throw Exception('Failed to delete bill (${res.statusCode})');
+    }
+  }
 }

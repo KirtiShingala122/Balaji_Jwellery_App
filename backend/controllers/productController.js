@@ -68,25 +68,70 @@ exports.addProduct = (req, res) => {
 exports.updateProduct = (req, res) => {
     const { id } = req.params;
     const { uniqueCode, name, description, categoryId, price, stockQuantity } = req.body;
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : req.body.imagePath;
+    const newImagePath = req.file ? `/uploads/${req.file.filename}` : req.body.imagePath;
 
-    db.query(
-        'UPDATE products SET uniqueCode=?, name=?, description=?, categoryId=?, price=?, stockQuantity=?, imagePath=? WHERE id=?',
-        [uniqueCode, name, description, categoryId, price, stockQuantity, imagePath, id],
-        (err) => {
-            if (err) return res.status(500).json({ error: 'Failed to update product' });
-            const fullImageUrl = imagePath ? `${req.protocol}://${req.get('host')}${imagePath}` : null;
-            res.json({ message: 'Product updated successfully', imageUrl: fullImageUrl });
-        }
-    );
+    // If a new file was uploaded, remove the old image file (if any)
+    const getSql = 'SELECT imagePath FROM products WHERE id = ?';
+    db.query(getSql, [id], (gErr, gRows) => {
+        if (gErr) return res.status(500).json({ error: 'Failed to fetch existing product' });
+
+        const oldImagePath = gRows && gRows[0] ? gRows[0].imagePath : null;
+
+        db.query(
+            'UPDATE products SET uniqueCode=?, name=?, description=?, categoryId=?, price=?, stockQuantity=?, imagePath=? WHERE id=?',
+            [uniqueCode, name, description, categoryId, price, stockQuantity, newImagePath, id],
+            (err) => {
+                if (err) return res.status(500).json({ error: 'Failed to update product' });
+
+                // delete old file if a new one replaced it
+                if (req.file && oldImagePath) {
+                    const rel = oldImagePath.replace(/^\/+/, '');
+                    const filePath = path.join(__dirname, '..', rel);
+                    fs.unlink(filePath, (uErr) => {
+                        if (uErr && uErr.code !== 'ENOENT') console.error('Failed to remove old image', uErr);
+                    });
+                }
+
+                const fullImageUrl = newImagePath ? `${req.protocol}://${req.get('host')}${newImagePath}` : null;
+                res.json({ message: 'Product updated successfully', imageUrl: fullImageUrl });
+            }
+        );
+    });
 };
 
 // Delete product
 exports.deleteProduct = (req, res) => {
     const { id } = req.params;
-    db.query('DELETE FROM products WHERE id=?', [id], (err) => {
-        if (err) return res.status(500).json({ error: 'Failed to delete product' });
-        res.json({ message: 'Product deleted successfully' });
+    // Check for references in bill_items to avoid FK constraint errors
+    // First fetch product to get imagePath and ensure it exists
+    db.query('SELECT imagePath FROM products WHERE id = ?', [id], (gErr, gRows) => {
+        if (gErr) return res.status(500).json({ error: 'Failed to fetch product' });
+        if (!gRows || gRows.length === 0) return res.status(404).json({ error: 'Product not found' });
+
+        const imagePath = gRows[0].imagePath;
+
+        db.query('SELECT COUNT(*) AS cnt FROM bill_items WHERE productId = ?', [id], (err, rows) => {
+            if (err) return res.status(500).json({ error: 'Failed to check product references' });
+            const cnt = rows[0].cnt || 0;
+            if (cnt > 0) {
+                return res.status(400).json({ error: 'Product is referenced by existing bills. Remove bill items referencing this product before deleting it.' });
+            }
+
+            db.query('DELETE FROM products WHERE id=?', [id], (err) => {
+                if (err) return res.status(500).json({ error: 'Failed to delete product' });
+
+                // remove image file if present (best-effort)
+                if (imagePath) {
+                    const rel = imagePath.replace(/^\/+/, '');
+                    const filePath = path.join(__dirname, '..', rel);
+                    fs.unlink(filePath, (uErr) => {
+                        if (uErr && uErr.code !== 'ENOENT') console.error('Failed to remove product image', uErr);
+                    });
+                }
+
+                res.json({ message: 'Product deleted successfully' });
+            });
+        });
     });
 };
 

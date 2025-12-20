@@ -334,21 +334,41 @@ class _BillingScreenState extends State<BillingScreen> {
                                 vertical: 12.h,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.light
+                                    ? Colors.white
+                                    : Theme.of(context).cardColor,
                                 borderRadius: BorderRadius.circular(12.r),
-                                border: Border.all(color: Colors.grey.shade300),
+                                border: Border.all(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.light
+                                      ? Colors.grey.shade300
+                                      : Colors.white12,
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.calendar_today_rounded,
                                     size: 18,
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? Colors.grey[800]
+                                        : Colors.white,
                                   ),
                                   SizedBox(width: 8.w),
                                   Text(
                                     '${billDate.day} ${_monthName(billDate.month)} ${billDate.year}',
                                     style: GoogleFonts.inter(
                                       fontWeight: FontWeight.w600,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.light
+                                          ? Colors.grey[800]
+                                          : Colors.white,
                                     ),
                                   ),
                                 ],
@@ -747,29 +767,52 @@ class _BillingScreenState extends State<BillingScreen> {
                                           : Colors.white70,
                                     ),
                                   ),
-                                  trailing: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        '₹${bill.totalAmount.toStringAsFixed(2)}',
-                                        style: GoogleFonts.inter(
-                                          fontWeight: FontWeight.w700,
+                                      Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '₹${bill.totalAmount.toStringAsFixed(2)}',
+                                            style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w700,
+                                              color:
+                                                  Theme.of(
+                                                        context,
+                                                      ).brightness ==
+                                                      Brightness.light
+                                                  ? Colors.grey[800]
+                                                  : Colors.white,
+                                            ),
+                                          ),
+                                          Text(
+                                            bill.paymentStatus.toUpperCase(),
+                                            style: GoogleFonts.inter(
+                                              color:
+                                                  bill.paymentStatus == 'paid'
+                                                  ? Colors.greenAccent
+                                                  : Colors.orangeAccent,
+                                              fontSize: 12.sp,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(width: 8.w),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.delete,
                                           color:
                                               Theme.of(context).brightness ==
                                                   Brightness.light
                                               ? Colors.grey[800]
                                               : Colors.white,
                                         ),
-                                      ),
-                                      Text(
-                                        bill.paymentStatus.toUpperCase(),
-                                        style: GoogleFonts.inter(
-                                          color: bill.paymentStatus == 'paid'
-                                              ? Colors.greenAccent
-                                              : Colors.orangeAccent,
-                                          fontSize: 12.sp,
-                                        ),
+                                        onPressed: () =>
+                                            _confirmDelete(bill.id!),
                                       ),
                                     ],
                                   ),
@@ -986,6 +1029,49 @@ class _BillingScreenState extends State<BillingScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(int billId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Invoice'),
+        content: const Text(
+          'Are you sure you want to delete this invoice? This will restore product stock.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      await _billService.deleteBill(billId);
+      if (mounted) {
+        await _loadAll();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invoice deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _readonlyField(

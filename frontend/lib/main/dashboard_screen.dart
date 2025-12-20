@@ -7,6 +7,7 @@ import '../models/product.dart';
 import '../services/bill_service.dart';
 import '../services/customer_service.dart';
 import '../services/product_service.dart';
+import '../services/dashboard_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -19,6 +20,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final BillService _billService = BillService();
   final CustomerService _customerService = CustomerService();
   final ProductService _productService = ProductService();
+  final DashboardService _dashboardService = DashboardService();
 
   bool _loading = true;
   String? _error;
@@ -42,27 +44,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      // Load all data concurrently
-      final results = await Future.wait([
-        _customerService.getAllCustomers(),
-        _billService.getBills(),
-        _productService.getAllProducts(),
-      ]);
+      // Get totals from backend summary (so totals aren't static in frontend)
+      try {
+        final summary = await _dashboardService.getDashboardStats();
+        _totalCustomers = (summary['totalCustomers'] as num).toInt();
+        _totalSales = (summary['totalSales'] as num).toDouble();
+        _totalProfit = (summary['totalProfit'] as num).toDouble();
+      } catch (e) {
+        // fallback to local calculation if backend fails
+        final results = await Future.wait([
+          _customerService.getAllCustomers(),
+          _billService.getBills(),
+          _productService.getAllProducts(),
+        ]);
+        final customers = results[0] as List<Customer>;
+        final bills = results[1] as List<BillRecord>;
+        final products = results[2] as List<Product>;
+        _totalCustomers = customers.length;
+        _totalSales = bills.fold(
+          0.0,
+          (sum, bill) => sum + bill.bill.totalAmount,
+        );
+        _totalProfit = _totalSales * 0.3;
+        await _calculateTrendingItem(bills, products);
+      }
 
-      final customers = results[0] as List<Customer>;
-      final bills = results[1] as List<BillRecord>;
-      final products = results[2] as List<Product>;
-
-      // Calculate metrics
-      _totalCustomers = customers.length;
-
-      _totalSales = bills.fold(0.0, (sum, bill) => sum + bill.bill.totalAmount);
-
-      // Calculate profit (assuming 30% profit margin for simplicity)
-      _totalProfit = _totalSales * 0.3;
-
-      // Find trending item (most sold product)
-      await _calculateTrendingItem(bills, products);
+      // For trending item we still need bills and products
+      try {
+        final bills = await _billService.getBills();
+        final products = await _productService.getAllProducts();
+        await _calculateTrendingItem(bills, products);
+      } catch (e) {
+        // ignore trending errors; trending will show 'No sales data' or error
+      }
 
       if (mounted) {
         setState(() {

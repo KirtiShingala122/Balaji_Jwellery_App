@@ -1,8 +1,9 @@
+//product_service.dart
 import 'dart:convert';
 import 'dart:typed_data'; // For web uploads
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-import 'dart:io' show File, Platform, HttpException; // Safe import for mobile
+import 'dart:io' show File, Platform; // Safe import for mobile
 import '../models/product.dart';
 
 class ProductService {
@@ -168,9 +169,20 @@ class ProductService {
     try {
       final res = await http.delete(Uri.parse("$baseUrl/$id"));
       if (res.statusCode != 200) {
-        throw Exception("Failed to delete product (${res.statusCode})");
+        String msg;
+        try {
+          final body = jsonDecode(res.body);
+          msg = body['error'] ?? body['message'] ?? res.body;
+        } catch (_) {
+          msg = res.body.isNotEmpty ? res.body : 'Status ${res.statusCode}';
+        }
+        throw Exception('API_ERROR:${res.statusCode}:$msg');
       }
     } catch (e) {
+      // Preserve API error format if already present
+      final s = e.toString();
+      if (s.contains('API_ERROR:'))
+        throw Exception(s.replaceFirst('Exception: ', ''));
       throw Exception("Error deleting product: $e");
     }
   }
