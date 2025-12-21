@@ -1,5 +1,7 @@
+import 'package:balaji_imitation_admin/firebase_options.dart';
 import 'package:balaji_imitation_admin/main/main_screen.dart';
 import 'package:balaji_imitation_admin/screens/auth/login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +18,7 @@ void main() async {
   final notificationService = NotificationService();
   await notificationService.initialize();
   await notificationService.requestPermission();
-
+ await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const BalajiImitationApp());
 }
 

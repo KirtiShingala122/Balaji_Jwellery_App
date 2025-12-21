@@ -57,6 +57,9 @@ dependencies:
   permission_handler: ^11.3.1
   path_provider: ^2.1.5
 
+  #firebase
+  firebase_core: ^4.3.0
+  firebase_storage: ^11.7.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
