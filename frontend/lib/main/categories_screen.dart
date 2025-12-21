@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../models/category.dart';
 import '../../services/category_service.dart';
+import '../../config/api_config.dart';
 import '../../widgets/custom_text_field.dart';
 import '../main/product_screen.dart';
 
@@ -218,7 +219,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                                 ? Image.memory(pickedImage!, fit: BoxFit.cover)
                                 : (category?.imagePath != null
                                       ? Image.network(
-                                          "http://localhost:3000${category!.imagePath}",
+                                          '${Api.baseHost}${category!.imagePath}',
                                           fit: BoxFit.cover,
                                           errorBuilder: (c, _, __) =>
                                               _emptyImagePlaceholder(),
@@ -475,7 +476,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               Positioned.fill(
                 child: c.imagePath != null
                     ? Image.network(
-                        "http://localhost:3000${c.imagePath}",
+                        '${Api.baseHost}${c.imagePath}',
                         fit: BoxFit.cover,
                       )
                     : Container(color: Theme.of(context).cardColor),

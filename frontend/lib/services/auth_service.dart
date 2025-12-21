@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/admin.dart';
+import '../config/api_config.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:3000/api/auth';
+  static final String baseUrl = Api.api('/api/auth');
   //static const String baseUrl = 'http://10.0.2.2:3000/api/auth';
 
   Admin? _currentAdmin;

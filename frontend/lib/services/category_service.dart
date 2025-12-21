@@ -1,8 +1,7 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io'
-    show Platform; // safe to import; not used in web branch at runtime
+// safe to import; not used in web branch at runtime
+import '../config/api_config.dart';
 
 import '../models/category.dart';
 
@@ -11,13 +10,7 @@ class CategoryService {
   final Dio dio = Dio();
 
   CategoryService() {
-    if (kIsWeb) {
-      baseUrl = "http://localhost:3000/api/categories";
-    } else if (Platform.isAndroid) {
-      baseUrl = "http://10.0.2.2:3000/api/categories";
-    } else {
-      baseUrl = "http://localhost:3000/api/categories";
-    }
+    baseUrl = Api.api('/api/categories');
   }
 
   Future<List<Category>> getAllCategories() async {

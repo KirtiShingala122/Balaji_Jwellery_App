@@ -4,19 +4,14 @@ import 'dart:typed_data'; // For web uploads
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'dart:io' show File, Platform; // Safe import for mobile
+import '../config/api_config.dart';
 import '../models/product.dart';
 
 class ProductService {
   late final String baseUrl;
 
   ProductService() {
-    if (kIsWeb) {
-      baseUrl = "http://localhost:3000/api/products"; // Web
-    } else if (Platform.isAndroid) {
-      baseUrl = "http://10.0.2.2:3000/api/products"; // Android emulator
-    } else {
-      baseUrl = "http://localhost:3000/api/products"; // Desktop / iOS simulator
-    }
+    baseUrl = Api.api('/api/products');
   }
 
   ///  Get all products
@@ -181,8 +176,9 @@ class ProductService {
     } catch (e) {
       // Preserve API error format if already present
       final s = e.toString();
-      if (s.contains('API_ERROR:'))
+      if (s.contains('API_ERROR:')) {
         throw Exception(s.replaceFirst('Exception: ', ''));
+      }
       throw Exception("Error deleting product: $e");
     }
   }

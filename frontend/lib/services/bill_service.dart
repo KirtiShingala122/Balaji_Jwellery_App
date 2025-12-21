@@ -1,8 +1,7 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import '../models/bill.dart';
+import '../config/api_config.dart';
 
 class BillRecord {
   final Bill bill;
@@ -20,13 +19,7 @@ class BillService {
   late final String baseUrl;
 
   BillService() {
-    if (kIsWeb) {
-      baseUrl = "http://localhost:3000/api/bills";
-    } else if (Platform.isAndroid) {
-      baseUrl = "http://10.0.2.2:3000/api/bills";
-    } else {
-      baseUrl = "http://localhost:3000/api/bills";
-    }
+    baseUrl = Api.api('/api/bills');
   }
 
   Future<List<BillRecord>> getBills() async {

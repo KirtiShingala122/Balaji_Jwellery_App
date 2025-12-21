@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/category.dart';
 import '../../models/product.dart';
+import '../../config/api_config.dart';
 import '../../services/product_service.dart';
 import '../../widgets/custom_text_field.dart';
 import 'package:image_picker/image_picker.dart';
@@ -158,7 +159,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 ? Image.memory(imageBytes!, fit: BoxFit.cover)
                                 : (product?.imagePath != null
                                       ? Image.network(
-                                          "http://localhost:3000${product!.imagePath}",
+                                          '${Api.baseHost}${product!.imagePath}',
                                           fit: BoxFit.cover,
                                         )
                                       : Center(
@@ -400,7 +401,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 ),
                 child: p.imagePath != null
                     ? Image.network(
-                        "http://localhost:3000${p.imagePath}",
+                        '${Api.baseHost}${p.imagePath}',
                         fit: BoxFit.cover,
                         width: double.infinity,
                       )
