@@ -58,8 +58,9 @@ dependencies:
   path_provider: ^2.1.5
 
   #firebase
-  firebase_core: ^4.3.0
+  firebase_core: ^2.32.0
   firebase_storage: ^11.7.0
+  firebase_auth: ^4.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

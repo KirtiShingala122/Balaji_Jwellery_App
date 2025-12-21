@@ -7,6 +7,7 @@ const app = express();
 
 //  Middlewares
 app.use(cors());
+// Required for Firebase Auth integration: parse JSON and urlencoded bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

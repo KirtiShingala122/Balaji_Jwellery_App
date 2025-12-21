@@ -9,3 +9,5 @@ backend/node_modules/
 # System
 .DS_Store
 *.log
+backend/*firebase-adminsdk*.json
+.env

@@ -18,7 +18,7 @@ void main() async {
   final notificationService = NotificationService();
   await notificationService.initialize();
   await notificationService.requestPermission();
- await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const BalajiImitationApp());
 }
 
@@ -235,37 +235,21 @@ class BalajiImitationApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatefulWidget {
+class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
   @override
-  State<AuthWrapper> createState() => _AuthWrapperState();
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    // Firebase is the source of truth for authentication
+    if (authProvider.isFirebaseSignedIn) {
+      return const MainScreen();
+    }
+    return const LoginScreen();
+  }
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
-  @override
-  void initState() {
-    super.initState();
-    _checkAuthStatus();
-  }
-
-  Future<void> _checkAuthStatus() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final isLoggedIn = await authProvider.checkLoginStatus();
-
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              isLoggedIn ? const MainScreen() : const LoginScreen(),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
+@override
+Widget build(BuildContext context) {
+  return const Scaffold(body: Center(child: CircularProgressIndicator()));
 }
