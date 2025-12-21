@@ -1,24 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/customer.dart';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import '../config/api_config.dart';
 
 class CustomerService {
   late final String baseUrl;
   late final String fallbackUrl;
 
   CustomerService() {
-    if (kIsWeb) {
-      baseUrl = "http://localhost:3000/api/customers";
-      fallbackUrl = "http://10.0.2.2:3000/api/customers";
-    } else if (Platform.isAndroid) {
-      baseUrl = "http://10.0.2.2:3000/api/customers";
-      fallbackUrl = "http://localhost:3000/api/customers";
-    } else {
-      baseUrl = "http://localhost:3000/api/customers";
-      fallbackUrl = "http://10.0.2.2:3000/api/customers";
-    }
+    baseUrl = Api.api('/api/customers');
+    // fallback kept for legacy Android emulator cases
+    fallbackUrl = Api.api('/api/customers');
   }
 
   Future<List<Customer>> getAllCustomers() async {

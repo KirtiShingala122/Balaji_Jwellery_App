@@ -31,6 +31,8 @@ app.use('/api/dashboard', dashboardRoutes);
 
 //  Start server
 const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(` Server running at http://localhost:${PORT}`);
+// Listen on all interfaces so your phone (on same Wi-Fi) can access the server
+// without changing routes or other logic.
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(` Server running at http://localhost:${PORT} and on 0.0.0.0:${PORT}`);
 });

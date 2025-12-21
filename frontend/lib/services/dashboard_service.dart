@@ -1,19 +1,12 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class DashboardService {
   late final String baseUrl;
 
   DashboardService() {
-    if (kIsWeb) {
-      baseUrl = "http://localhost:3000/api/dashboard";
-    } else if (Platform.isAndroid) {
-      baseUrl = "http://10.0.2.2:3000/api/dashboard";
-    } else {
-      baseUrl = "http://localhost:3000/api/dashboard";
-    }
+    baseUrl = Api.api('/api/dashboard');
   }
 
   Future<Map<String, dynamic>> getDashboardStats() async {
