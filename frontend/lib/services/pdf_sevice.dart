@@ -306,8 +306,19 @@ class PDFService {
       return 'downloaded';
     }
 
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/bill_${bill.billNumber}.pdf');
+    Directory? directory;
+    if (Platform.isAndroid) {
+      directory = Directory('/storage/emulated/0/Download');
+      if (!directory.existsSync()) {
+        directory = await getExternalStorageDirectory();
+      }
+    } else if (Platform.isIOS) {
+      directory = await getApplicationDocumentsDirectory();
+    } else {
+      directory = await getApplicationDocumentsDirectory();
+    }
+
+    final file = File('${directory?.path}/bill_${bill.billNumber}.pdf');
     await file.writeAsBytes(pdfBytes);
     return file.path;
   }

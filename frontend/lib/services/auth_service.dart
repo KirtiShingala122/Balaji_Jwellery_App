@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/admin.dart';
 import '../config/api_config.dart';
+// Optional: uses Firebase ID token if present in SharedPreferences
 
 class AuthService {
   static final String baseUrl = Api.api('/api/auth');
@@ -21,21 +22,56 @@ class AuthService {
   bool get isLoggedIn => _isLoggedIn;
   String? get token => _token;
 
+  static const String _fbTokenKey = 'firebase_id_token';
+
+  Future<Map<String, String>> _defaultHeaders({String? firebaseIdToken}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedFbToken = prefs.getString(_fbTokenKey);
+    final effectiveFbToken = firebaseIdToken ?? storedFbToken;
+
+    String? authValue;
+    if (effectiveFbToken != null && effectiveFbToken.isNotEmpty) {
+      // Prefer Firebase ID token when available
+      authValue = 'Bearer $effectiveFbToken';
+    } else if (_token != null) {
+      authValue = 'Bearer $_token';
+    }
+
+    final headers = {'Content-Type': 'application/json'};
+    if (authValue != null) headers['Authorization'] = authValue;
+    return headers;
+  }
+
   ///  Register new admin
-  Future<bool> register(Admin admin) async {
+  Future<bool> register(Admin admin, {String? firebaseIdToken}) async {
     final url = Uri.parse('$baseUrl/register');
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final headers = await _defaultHeaders(firebaseIdToken: firebaseIdToken);
+      Map<String, dynamic> payload;
+      if (firebaseIdToken != null) {
+        payload = {
           'username': admin.username,
           'email': admin.email,
           'fullName': admin.fullName,
+          'phoneNumber': admin.phoneNumber,
+          'address': admin.address,
+          // firebaseUid is not required in body, backend will extract from token, but send for debug
+        };
+      } else {
+        payload = {
+          'username': admin.username,
           'password': admin.password,
-        }),
+          'email': admin.email,
+          'fullName': admin.fullName,
+          'phoneNumber': admin.phoneNumber,
+          'address': admin.address,
+        };
+      }
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(payload),
       );
-
       if (response.statusCode == 201) {
         print(' Registration successful');
         return true;
@@ -50,23 +86,31 @@ class AuthService {
   }
 
   /// Login existing admin
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(
+    String username,
+    String password, {
+    String? firebaseIdToken,
+  }) async {
     final url = Uri.parse('$baseUrl/login');
     try {
+      final headers = await _defaultHeaders(firebaseIdToken: firebaseIdToken);
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
+        headers: headers,
+        body: firebaseIdToken != null
+            ? jsonEncode({})
+            : jsonEncode({'username': username, 'password': password}),
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        if (data['admin'] != null) {
+          _currentAdmin = Admin.fromMap(data['admin']);
+        }
 
-        _currentAdmin = Admin.fromMap(data['admin']);
-        _token = data['token']; // Save JWT
+        // Firebase-backed login will not return a legacy token; keep for
+        // backward compatibility if provided.
+        _token = data['token'];
         _isLoggedIn = true;
-
-        // Save to SharedPreferences for persistent login
         await _saveLoginData();
 
         print(' Login successful for ${_currentAdmin?.username}');
@@ -140,16 +184,12 @@ class AuthService {
     String currentPassword,
     String newPassword,
   ) async {
-    if (_token == null) return false;
-
     final url = Uri.parse('$baseUrl/change-password');
     try {
+      final headers = await _defaultHeaders();
       final res = await http.put(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
+        headers: headers,
         body: jsonEncode({
           'currentPassword': currentPassword,
           'newPassword': newPassword,
@@ -176,16 +216,12 @@ class AuthService {
     String? phoneNumber,
     String? address,
   }) async {
-    if (_token == null) return null;
-
     final url = Uri.parse('$baseUrl/profile');
     try {
+      final headers = await _defaultHeaders();
       final res = await http.put(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
+        headers: headers,
         body: jsonEncode({
           'fullName': fullName,
           'username': username,

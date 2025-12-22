@@ -5,7 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
+import '../../screens/auth/login_screen.dart';
 import '../../providers/theme_provider.dart';
+import '../../services/firebase_auth_service.dart';
 
 // DARK MODE
 const Color darkBg = Color.fromARGB(255, 22, 22, 22);
@@ -267,14 +269,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         children: [
           _tile(
-            icon: Icons.lock_outline,
-            title: 'Change Password',
-            subtitle: 'Update your login password',
-            onTap: _openChangePassword,
+            icon: Icons.email_outlined,
+            title: 'Reset Password',
+            subtitle: 'Send password reset email',
+            onTap: _openResetPassword,
+            primary: primary,
+          ),
+          _tile(
+            icon: Icons.logout_outlined,
+            title: 'Logout',
+            subtitle: 'Sign out of your account',
+            onTap: _confirmLogout,
             primary: primary,
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _confirmLogout() async {
+    final should = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (should != true) return;
+
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    await auth.logout();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Logged out')));
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 
@@ -446,10 +490,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _openChangePassword() async {
-    final currentCtrl = TextEditingController();
-    final newCtrl = TextEditingController();
-    final confirmCtrl = TextEditingController();
+  /// Open a bottom sheet to request an email address and send a Firebase
+  /// password reset link. Uses [FirebaseAuthService.sendPasswordResetEmail].
+  Future<void> _openResetPassword() async {
+    final emailCtrl = TextEditingController(text: _emailCtrl.text);
 
     await showModalBottomSheet(
       context: context,
@@ -471,43 +515,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               _sheetGrabber(),
               SizedBox(height: 12.h),
-              _textField('Current password', currentCtrl, obscure: true),
-              SizedBox(height: 10.h),
-              _textField('New password', newCtrl, obscure: true),
-              SizedBox(height: 10.h),
-              _textField('Confirm new password', confirmCtrl, obscure: true),
+              _textField(
+                'Email',
+                emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+              ),
               SizedBox(height: 16.h),
               ElevatedButton(
                 onPressed: () async {
-                  if (newCtrl.text.trim() != confirmCtrl.text.trim()) {
+                  final email = emailCtrl.text.trim();
+                  if (email.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Passwords do not match')),
+                      const SnackBar(content: Text('Please enter your email')),
                     );
                     return;
                   }
 
-                  final auth = Provider.of<AuthProvider>(
-                    context,
-                    listen: false,
-                  );
-                  final ok = await auth.changePassword(
-                    currentCtrl.text.trim(),
-                    newCtrl.text.trim(),
-                  );
-
-                  if (mounted) Navigator.pop(ctx);
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          ok
-                              ? 'Password updated'
-                              : auth.errorMessage ??
-                                    'Unable to update password',
+                  try {
+                    final fb = FirebaseAuthService();
+                    await fb.sendPasswordResetEmail(email);
+                    if (mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Password reset email sent'),
                         ),
-                      ),
-                    );
+                      );
+                    }
+                  } catch (e) {
+                    final message = e is Exception
+                        ? e.toString().replaceFirst('Exception: ', '')
+                        : 'Failed to send password reset email';
+                    if (mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -516,7 +559,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                   ).elevatedButtonTheme.style?.backgroundColor?.resolve({}),
                 ),
-                child: const Text('Save'),
+                child: const Text('Send reset email'),
               ),
             ],
           ),

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/admin.dart';
 import '../services/auth_service.dart';
+import '../services/firebase_auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final FirebaseAuthService _fbService = FirebaseAuthService();
 
   Admin? _currentAdmin;
   bool _isLoading = false;
@@ -12,24 +14,40 @@ class AuthProvider with ChangeNotifier {
   Admin? get currentAdmin => _currentAdmin;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get isLoggedIn => _authService.isLoggedIn;
+  bool get isFirebaseSignedIn => _fbService.isSignedIn;
 
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(String email, String password) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final success = await _authService.login(username, password);
-      if (success) {
-        _currentAdmin = _authService.currentAdmin;
-        notifyListeners();
-        return true;
-      } else {
-        _setError('Invalid username or password');
+      // 1️ Firebase login (source of truth)
+      await _fbService.loginWithEmailPassword(email, password);
+      final idToken = await _fbService.getIdToken();
+
+      if (idToken == null) {
+        _setError('Firebase authentication failed');
         return false;
       }
+
+      // 2️ Backend verification (profile fetch)
+      final success = await _authService.login(
+        '', // username not needed for Firebase login
+        '', // password not sent to backend
+        firebaseIdToken: idToken,
+      );
+
+      if (!success) {
+        _setError('Server verification failed');
+        return false;
+      }
+
+      // Mark app as logged in
+      _currentAdmin = _authService.currentAdmin;
+      notifyListeners();
+      return true;
     } catch (e) {
-      _setError('Login failed: ${e.toString()}');
+      _setError(e.toString());
       return false;
     } finally {
       _setLoading(false);
@@ -41,15 +59,28 @@ class AuthProvider with ChangeNotifier {
     _clearError();
 
     try {
-      final success = await _authService.register(admin);
-      if (success) {
-        _currentAdmin = _authService.currentAdmin;
-        notifyListeners();
-        return true;
-      } else {
-        _setError('Registration failed. Username or email may already exist.');
+      // Create Firebase account first to obtain a verified ID token.
+      await _fbService.registerWithEmailPassword(admin.email, admin.password);
+
+      final idToken = await _fbService.getIdToken();
+      if (idToken == null) {
+        _setError('Unable to retrieve Firebase session. Please try again.');
         return false;
       }
+
+      final success = await _authService.register(
+        admin,
+        firebaseIdToken: idToken,
+      );
+
+      if (success) {
+        _currentAdmin = _authService.currentAdmin ?? admin;
+        notifyListeners();
+        return true;
+      }
+
+      _setError('Registration failed. Username or email may already exist.');
+      return false;
     } catch (e) {
       _setError('Registration failed: ${e.toString()}');
       return false;
@@ -60,6 +91,10 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     _setLoading(true);
+    // Logout from both backend service and Firebase (if signed in)
+    try {
+      await _fbService.logout();
+    } catch (_) {}
     await _authService.logout();
     _currentAdmin = null;
     _clearError();
@@ -70,16 +105,28 @@ class AuthProvider with ChangeNotifier {
   Future<bool> checkLoginStatus() async {
     _setLoading(true);
     try {
-      final isLoggedIn = await _authService.checkLoginStatus();
-      if (isLoggedIn) {
-        _currentAdmin = _authService.currentAdmin;
-      } else {
+      //  Firebase decides session
+      if (!_fbService.isSignedIn) {
         _currentAdmin = null;
+        return false;
       }
-      notifyListeners();
-      return isLoggedIn;
-    } catch (e) {
-      _setError('Failed to check login status: ${e.toString()}');
+
+      final idToken = await _fbService.getIdToken();
+      if (idToken == null) return false;
+
+      // Ask backend for profile
+      final success = await _authService.login(
+        '',
+        '',
+        firebaseIdToken: idToken,
+      );
+
+      if (success) {
+        _currentAdmin = _authService.currentAdmin;
+        notifyListeners();
+        return true;
+      }
+
       return false;
     } finally {
       _setLoading(false);
@@ -90,30 +137,9 @@ class AuthProvider with ChangeNotifier {
     String currentPassword,
     String newPassword,
   ) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final success = await _authService.changePassword(
-        currentPassword,
-        newPassword,
-      );
-      if (success) {
-        _currentAdmin = _authService.currentAdmin;
-        notifyListeners();
-        return true;
-      } else {
-        _setError(
-          'Failed to change password. Current password may be incorrect.',
-        );
-        return false;
-      }
-    } catch (e) {
-      _setError('Failed to change password: ${e.toString()}');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
+    // Password changes are managed by Firebase only
+    _setError('Password is managed by Firebase. Use "Forgot Password".');
+    return false;
   }
 
   Future<Admin?> updateProfile({
