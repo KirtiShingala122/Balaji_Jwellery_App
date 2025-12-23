@@ -9,15 +9,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/theme_provider.dart';
-import 'services/notification_service.dart';
+// import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize notification service
-  final notificationService = NotificationService();
-  await notificationService.initialize();
-  await notificationService.requestPermission();
+  // final notificationService = NotificationService();
+  // await notificationService.initialize();
+  // await notificationService.requestPermission();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const BalajiImitationApp());
 }

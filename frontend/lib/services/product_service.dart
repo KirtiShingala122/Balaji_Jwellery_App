@@ -121,7 +121,7 @@ class ProductService {
         Uri.parse("$baseUrl/${product.id}"),
       );
 
-      // ✅ Send only backend-required fields
+      //  Send only backend-required fields
       request.fields.addAll({
         'uniqueCode': product.uniqueCode,
         'name': product.name,
@@ -131,7 +131,7 @@ class ProductService {
         'stockQuantity': product.stockQuantity.toString(),
       });
 
-      // ✅ Add image if available
+      //  Add image if available
       if (!kIsWeb && imageFile != null) {
         request.files.add(
           await http.MultipartFile.fromPath('image', imageFile.path),
