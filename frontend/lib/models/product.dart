@@ -50,19 +50,19 @@ class Product {
       categoryId: map['categoryId'] ?? 0,
       categoryName: map['categoryName'],
 
-      // ✅ Safe parsing for price (handles string or number)
+      //  Safe parsing for price (handles string or number)
       price: map['price'] is num
           ? (map['price'] as num).toDouble()
           : double.tryParse(map['price'].toString()) ?? 0.0,
 
-      // ✅ Safe parsing for stockQuantity
+      //  Safe parsing for stockQuantity
       stockQuantity: map['stockQuantity'] is num
           ? (map['stockQuantity'] as num).toInt()
           : int.tryParse(map['stockQuantity'].toString()) ?? 0,
 
       imagePath: map['imagePath'],
 
-      // ✅ Parse createdAt / updatedAt safely
+      //  Parse createdAt / updatedAt safely
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),

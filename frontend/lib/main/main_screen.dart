@@ -83,9 +83,6 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // ⬇⬇⬇ MOBILE DESIGN — Luxury Balaji UI (matching Categories Screen)
-  // ---------------------------------------------------------------------------
   Widget _buildMobileLayout() {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -103,7 +100,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  //  Top Navigation (Redesigned to match Category UI)
   AppBar _buildLuxuryAppBar() {
     return AppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -153,7 +149,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // 🌟 Bottom Navigation (Matches high-end category UI)
   Widget _buildLuxuryBottomNav() {
     return Container(
       decoration: BoxDecoration(
@@ -195,7 +190,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // 📌 Individual Bottom Nav Item
   Widget _luxuryNavItem({
     required IconData icon,
     required String label,
@@ -257,9 +251,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // ⬇⬇⬇ TABLET LAYOUT - Side Navigation with larger content
-  // ---------------------------------------------------------------------------
   Widget _buildTabletLayout() {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -328,9 +319,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // ⬇⬇⬇ DESKTOP LAYOUT - Full dashboard with navigation
-  // ---------------------------------------------------------------------------
   Widget _buildDesktopLayout() {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

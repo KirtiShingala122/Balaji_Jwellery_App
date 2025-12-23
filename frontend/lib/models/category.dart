@@ -27,7 +27,7 @@ class Category {
   }
 
   factory Category.fromMap(Map<String, dynamic> map) {
-    print('🔄 Parsing category from map: $map');
+    print('Parsing category from map: $map');
     try {
       final category = Category(
         id: map['id'],
@@ -42,11 +42,11 @@ class Category {
             : DateTime.now(),
       );
       print(
-        '✅ Category parsed: ${category.name}, imagePath: ${category.imagePath}',
+        ' Category parsed: ${category.name}, imagePath: ${category.imagePath}',
       );
       return category;
     } catch (e) {
-      print('❌ Error parsing category: $e');
+      print(' Error parsing category: $e');
       rethrow;
     }
   }
