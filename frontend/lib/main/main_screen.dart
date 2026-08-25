@@ -6,6 +6,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import 'dashboard_screen.dart';
 import 'categories_screen.dart';
+import 'products_screen.dart';
+import 'reports_screen.dart';
+import 'chat_screen.dart';
+import 'billing_screen.dart';
+import 'customers_screen.dart';
+import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,37 +27,42 @@ class _MainScreenState extends State<MainScreen> {
   final List<MainScreenItem> _screens = [
     MainScreenItem(
       title: 'Dashboard',
-      icon: Icons.dashboard,
+      icon: Icons.dashboard_rounded,
       screen: const DashboardScreen(),
     ),
     MainScreenItem(
       title: 'Categories',
-      icon: Icons.category,
+      icon: Icons.category_rounded,
       screen: const CategoriesScreen(),
     ),
     MainScreenItem(
       title: 'Products',
-      icon: Icons.inventory,
-      screen: const ProductsScreen(),
+      icon: Icons.inventory_2_rounded,
+      screen: const AllProductsScreen(),
     ),
     MainScreenItem(
       title: 'Billing',
-      icon: Icons.receipt,
+      icon: Icons.receipt_long_rounded,
       screen: const BillingScreen(),
     ),
     MainScreenItem(
       title: 'Customers',
-      icon: Icons.people,
+      icon: Icons.people_rounded,
       screen: const CustomersScreen(),
     ),
     MainScreenItem(
       title: 'Reports',
-      icon: Icons.analytics,
+      icon: Icons.analytics_rounded,
       screen: const ReportsScreen(),
     ),
     MainScreenItem(
+      title: 'AI Assistant',
+      icon: Icons.smart_toy_rounded,
+      screen: const ChatScreen(),
+    ),
+    MainScreenItem(
       title: 'Settings',
-      icon: Icons.settings,
+      icon: Icons.settings_rounded,
       screen: const SettingsScreen(),
     ),
   ];
@@ -82,10 +93,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar
           _buildSidebar(),
-
-          // Main Content
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -104,14 +112,18 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildSidebar() {
     return Container(
-      width: 280.w,
+      width: 240.w,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E3A8A),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E3A8A), Color(0xFF1E40AF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(2, 0),
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(3, 0),
           ),
         ],
       ),
@@ -119,15 +131,23 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           // Header
           Container(
-            padding: EdgeInsets.all(24.w),
+            padding: EdgeInsets.fromLTRB(20.w, 32.h, 20.w, 20.h),
             child: Column(
               children: [
-                Icon(Icons.diamond, size: 40.w, color: Colors.white),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.diamond_rounded,
+                      size: 32.w, color: Colors.white),
+                ),
                 SizedBox(height: 12.h),
                 Text(
                   'Balaji Imitation',
                   style: GoogleFonts.poppins(
-                    fontSize: 18.sp,
+                    fontSize: 16.sp,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -135,24 +155,29 @@ class _MainScreenState extends State<MainScreen> {
                 Text(
                   'Admin Panel',
                   style: GoogleFonts.poppins(
-                    fontSize: 12.sp,
-                    color: Colors.white70,
+                    fontSize: 11.sp,
+                    color: Colors.white60,
                   ),
                 ),
               ],
             ),
           ),
 
+          Divider(color: Colors.white.withOpacity(0.15), height: 1),
+          SizedBox(height: 8.h),
+
           // Navigation Items
           Expanded(
             child: ListView.builder(
               itemCount: _screens.length,
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
               itemBuilder: (context, index) {
                 final item = _screens[index];
                 final isSelected = _currentIndex == index;
+                final isAI = item.title == 'AI Assistant';
 
                 return Container(
-                  margin: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                  margin: EdgeInsets.symmetric(vertical: 2.h),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -166,38 +191,68 @@ class _MainScreenState extends State<MainScreen> {
                           curve: Curves.easeInOut,
                         );
                       },
-                      borderRadius: BorderRadius.circular(12.r),
+                      borderRadius: BorderRadius.circular(10.r),
                       child: Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: 16.w,
-                          vertical: 12.h,
+                          horizontal: 14.w,
+                          vertical: 11.h,
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? Colors.white.withOpacity(0.2)
+                              ? Colors.white.withOpacity(0.18)
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12.r),
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: isAI && !isSelected
+                              ? Border.all(
+                                  color:
+                                      const Color(0xFF60A5FA).withOpacity(0.4),
+                                  width: 1,
+                                )
+                              : null,
                         ),
                         child: Row(
                           children: [
                             Icon(
                               item.icon,
-                              size: 20.w,
-                              color: isSelected ? Colors.white : Colors.white70,
+                              size: 18.w,
+                              color: isSelected
+                                  ? Colors.white
+                                  : isAI
+                                      ? const Color(0xFF93C5FD)
+                                      : Colors.white60,
                             ),
-                            SizedBox(width: 12.w),
-                            Text(
-                              item.title,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14.sp,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white70,
+                            SizedBox(width: 10.w),
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13.sp,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : isAI
+                                          ? const Color(0xFF93C5FD)
+                                          : Colors.white70,
+                                ),
                               ),
                             ),
+                            if (isAI)
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 6.w, vertical: 2.h),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF3B82F6)
+                                      .withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                ),
+                                child: Text('AI',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 8.sp,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                              ),
                           ],
                         ),
                       ),
@@ -210,11 +265,12 @@ class _MainScreenState extends State<MainScreen> {
 
           // User Info and Logout
           Container(
-            padding: EdgeInsets.all(16.w),
+            padding: EdgeInsets.all(14.w),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.1),
               border: Border(
-                top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1),
+                top: BorderSide(
+                    color: Colors.white.withOpacity(0.15), width: 1),
               ),
             ),
             child: Column(
@@ -224,15 +280,15 @@ class _MainScreenState extends State<MainScreen> {
                     return Row(
                       children: [
                         CircleAvatar(
-                          radius: 20.r,
+                          radius: 18.r,
                           backgroundColor: Colors.white.withOpacity(0.2),
                           child: Icon(
-                            Icons.person,
+                            Icons.person_rounded,
                             color: Colors.white,
-                            size: 20.w,
+                            size: 18.w,
                           ),
                         ),
-                        SizedBox(width: 12.w),
+                        SizedBox(width: 10.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,16 +296,17 @@ class _MainScreenState extends State<MainScreen> {
                               Text(
                                 authProvider.currentAdmin?.fullName ?? 'Admin',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 12.sp,
+                                  fontSize: 11.sp,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                               Text(
                                 authProvider.currentAdmin?.username ?? '',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 10.sp,
-                                  color: Colors.white70,
+                                  fontSize: 9.sp,
+                                  color: Colors.white60,
                                 ),
                               ),
                             ],
@@ -259,20 +316,21 @@ class _MainScreenState extends State<MainScreen> {
                     );
                   },
                 ),
-                SizedBox(height: 12.h),
+                SizedBox(height: 10.h),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _handleLogout,
-                    icon: Icon(Icons.logout, size: 16.w),
+                    icon: Icon(Icons.logout_rounded, size: 14.w),
                     label: Text(
                       'Logout',
                       style: GoogleFonts.poppins(fontSize: 12.sp),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[600],
+                      backgroundColor: Colors.red.shade600,
                       foregroundColor: Colors.white,
                       padding: EdgeInsets.symmetric(vertical: 8.h),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8.r),
                       ),
@@ -309,47 +367,73 @@ class MainScreenItem {
   });
 }
 
-class ProductsScreen extends StatelessWidget {
-  const ProductsScreen({super.key});
+// ─── All Products Screen (sidebar entry — guides user to categories) ─────────
+class AllProductsScreen extends StatelessWidget {
+  const AllProductsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Products Screen - Coming Soon'));
-  }
-}
-
-class BillingScreen extends StatelessWidget {
-  const BillingScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Billing Screen - Coming Soon'));
-  }
-}
-
-class CustomersScreen extends StatelessWidget {
-  const CustomersScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Customers Screen - Coming Soon'));
-  }
-}
-
-class ReportsScreen extends StatelessWidget {
-  const ReportsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Reports Screen - Coming Soon'));
-  }
-}
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: Text('Settings Screen - Coming Soon'));
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                    color: Color(0xFFE2E8F0),
+                    blurRadius: 4,
+                    offset: Offset(0, 2))
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.inventory_2_rounded,
+                    color: const Color(0xFF1E3A8A), size: 26.w),
+                SizedBox(width: 12.w),
+                Text(
+                  'Products',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1E3A8A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.category_rounded,
+                      size: 64.w,
+                      color: const Color(0xFF3B82F6).withOpacity(0.5)),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'Select a Category to View Products',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E3A8A),
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    'Go to Categories → tap a category → manage its products',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13.sp, color: Colors.grey.shade500),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
