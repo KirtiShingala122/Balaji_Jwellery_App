@@ -1,15 +1,22 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class DashboardService {
-  final String baseUrl = "http://localhost:3000/api/dashboard";
- // final String baseUrl = "http://10.0.2.2:3000/api/dashboard";
+  late final String baseUrl;
+
+  DashboardService() {
+    baseUrl = Api.api('/api/dashboard');
+  }
+
   Future<Map<String, dynamic>> getDashboardStats() async {
-    final response = await http.get(Uri.parse(baseUrl));
+    final response = await http.get(Uri.parse('$baseUrl/summary'));
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
-      throw Exception('Failed to load dashboard stats');
+      throw Exception(
+        'Failed to load dashboard stats (${response.statusCode})',
+      );
     }
   }
 }

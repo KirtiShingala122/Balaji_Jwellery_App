@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { register, login, verifyToken } = require('../controllers/authController');
+const {
+    register,
+    login,
+    verifyToken,
+    updateProfile,
+} = require('../controllers/authController');
 
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
 
-// Example of a protected route (test only)
-router.get('/protected', verifyToken, (req, res) => {
-    res.json({ message: `Hello, ${req.user.username}! Token is valid.` });
-});
+// Protected routes
+//router.put('/change-password', verifyToken, changePassword); // Disabled: Password managed by Firebase only
+router.put('/profile', verifyToken, updateProfile);
 
 module.exports = router;

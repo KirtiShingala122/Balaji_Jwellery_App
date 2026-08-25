@@ -4,6 +4,8 @@ class Admin {
   final String email;
   final String fullName;
   final String password;
+  final String? phoneNumber;
+  final String? address;
 
   Admin({
     this.id,
@@ -11,6 +13,8 @@ class Admin {
     required this.email,
     required this.fullName,
     required this.password,
+    this.phoneNumber,
+    this.address,
   });
 
   factory Admin.fromMap(Map<String, dynamic> map) {
@@ -20,6 +24,8 @@ class Admin {
       email: map['email'] ?? '',
       fullName: map['fullName'] ?? '',
       password: map['password'] ?? '',
+      phoneNumber: map['phoneNumber'],
+      address: map['address'],
     );
   }
 
@@ -30,6 +36,8 @@ class Admin {
       'email': email,
       'fullName': fullName,
       'password': password,
+      'phoneNumber': phoneNumber,
+      'address': address,
     };
   }
 }

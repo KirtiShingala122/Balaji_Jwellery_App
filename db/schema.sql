@@ -17,7 +17,10 @@ CREATE TABLE admins (
   password VARCHAR(255) NOT NULL,
   email VARCHAR(150) UNIQUE,
   fullName VARCHAR(150) NOT NULL,
+  phoneNumber VARCHAR(20),
+  address VARCHAR(255),
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   lastLogin DATETIME
 );
 
@@ -91,8 +94,8 @@ CREATE INDEX idx_bills_customer ON bills (customerId);
 CREATE INDEX idx_bill_items_bill ON bill_items (billId);
 
 -- Step 10: Insert Sample Data
-INSERT INTO admins (username, password, email, fullName)
-VALUES ('admin', 'admin123', 'admin@balajiimitation.com', 'Admin User');
+INSERT INTO admins (username, password, email, fullName, phoneNumber, address)
+VALUES ('admin', 'admin123', 'admin@balajiimitation.com', 'Admin User', NULL, NULL);
 
 INSERT INTO categories (name, description) VALUES
 ('Rings', 'All types of imitation rings'),

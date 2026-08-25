@@ -44,7 +44,9 @@ class CustomTextField extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: FontWeight.w500,
-            color: const Color(0xFF374151),
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey[800]
+                : Colors.white,
           ),
         ),
         SizedBox(height: 8.h),
@@ -60,58 +62,64 @@ class CustomTextField extends StatelessWidget {
           maxLength: maxLength,
           style: GoogleFonts.poppins(
             fontSize: 14.sp,
-            color: const Color(0xFF111827),
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey[800]
+                : Colors.white,
           ),
           decoration: InputDecoration(
             hintText: hintText ?? labelText,
             hintStyle: GoogleFonts.poppins(
               fontSize: 14.sp,
-              color: Colors.grey[400],
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Colors.grey[600]
+                  : Colors.white70,
             ),
             prefixIcon: prefixIcon != null
                 ? Icon(
                     prefixIcon,
-                    color: const Color(0xFF6B7280),
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? Colors.grey[600]
+                        : Colors.white70,
                     size: 20.w,
                   )
                 : null,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: Colors.grey[50],
+            fillColor: Theme.of(context).cardColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
               borderSide: BorderSide(
-                color: Colors.grey[300]!,
-                width: 1,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.grey[300]!
+                    : Colors.white24,
+                width: 1.1,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
               borderSide: BorderSide(
-                color: Colors.grey[300]!,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.grey[300]!
+                    : Colors.white24,
                 width: 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(
-                color: Color(0xFF3B82F6),
-                width: 2,
+              borderSide: BorderSide(
+                color: Theme.of(context).brightness == Brightness.light
+                    ? const Color(0xFF8B6F47)
+                    : Colors.white,
+                width: 1.4,
               ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: Colors.red, width: 1.4),
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: 16.w,
