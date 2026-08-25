@@ -1,244 +1,698 @@
+//setting_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../models/admin.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
+import '../../screens/auth/login_screen.dart';
+import '../../providers/theme_provider.dart';
+import '../../services/firebase_auth_service.dart';
 
-class SettingsScreen extends StatelessWidget {
+// DARK MODE
+const Color darkBg = Color.fromARGB(255, 22, 22, 22);
+const Color darkSurface = Color.fromARGB(255, 46, 44, 44);
+
+// LIGHT MODE
+const Color lightBg = Colors.white;
+const Color lightSurface = Color(0xFFF4F4F4);
+
+// COMMON
+const Color nudeBrown = Color(0xFF8B6F47);
+
+// Removed context-dependent consts from top-level.
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final _nameCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+
+  bool _notifications = true;
+  bool _savingProfile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _hydrate();
+  }
+
+  Future<void> _hydrate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final admin = auth.currentAdmin;
+
+    _nameCtrl.text =
+        admin?.fullName ?? prefs.getString('settings_name') ?? 'User';
+    _usernameCtrl.text =
+        admin?.username ?? prefs.getString('settings_username') ?? 'username';
+    _emailCtrl.text = admin?.email ?? prefs.getString('settings_email') ?? '';
+    _phoneCtrl.text =
+        admin?.phoneNumber ?? prefs.getString('settings_phone') ?? '';
+    _addressCtrl.text =
+        admin?.address ?? prefs.getString('settings_address') ?? '';
+    _notifications = prefs.getBool('settings_notifications') ?? true;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _persistProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('settings_name', _nameCtrl.text.trim());
+    await prefs.setString('settings_username', _usernameCtrl.text.trim());
+    await prefs.setString('settings_email', _emailCtrl.text.trim());
+    await prefs.setString('settings_phone', _phoneCtrl.text.trim());
+    await prefs.setString('settings_address', _addressCtrl.text.trim());
+    await prefs.setBool('settings_notifications', _notifications);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _usernameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
+
+  // ONLY COLOR-RELATED CHANGES MADE
+  @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color surface = isDark
+        ? const Color.fromARGB(255, 22, 22, 22)
+        : lightBg;
+    final Color cardColor = isDark
+        ? const Color.fromARGB(255, 42, 43, 44)
+        : lightSurface;
+    final Color textPrimary = isDark ? Colors.white : Colors.grey[800]!;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F6),
-      body: Column(
+      backgroundColor: surface,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: cardColor,
+        iconTheme: IconThemeData(color: textPrimary),
+        title: Text(
+          'Settings',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            color: textPrimary,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 14.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionTitle('Account', textPrimary),
+              _accountCard(cardColor, textPrimary, isDark),
+              SizedBox(height: 16.h),
+              _sectionTitle('Preferences', textPrimary),
+              _preferencesCard(cardColor, textPrimary),
+              SizedBox(height: 16.h),
+              _sectionTitle('Security', textPrimary),
+              _securityCard(cardColor, textPrimary),
+              SizedBox(height: 16.h),
+              _sectionTitle('About', textPrimary),
+              _aboutCard(cardColor, textPrimary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String text, Color color) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _accountCard(Color cardColor, Color primary, bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18.r),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.white.withValues(alpha: 0.8)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: Theme.of(context).brightness == Brightness.light
+                ? 12
+                : 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      child: Row(
         children: [
-          _buildHeader(),
+          CircleAvatar(
+            radius: 28.w,
+            backgroundColor: isDark ? Colors.transparent : Colors.white,
+            child: Icon(Icons.person, color: primary, size: 28.w),
+          ),
+          SizedBox(width: 14.w),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSectionTitle('Account'),
-                _buildProfileCard(authProvider.currentAdmin),
-                SizedBox(height: 24.h),
-                _buildSectionTitle('Preferences'),
-                _buildSettingsCard(
-                  children: [
-                    _buildSettingsTile(
-                      icon: Icons.palette_outlined,
-                      title: 'Appearance',
-                      subtitle: 'Customize theme, colors, and fonts',
-                      onTap: () {
-                        // TODO: Implement theme customization
-                      },
-                    ),
-                    _buildSettingsTile(
-                      icon: Icons.notifications_outlined,
-                      title: 'Notifications',
-                      subtitle: 'Manage push and email notifications',
-                      onTap: () {
-                        // TODO: Implement notification settings
-                      },
-                    ),
-                    _buildSettingsTile(
-                      icon: Icons.language_outlined,
-                      title: 'Language',
-                      subtitle: 'English (United States)',
-                      onTap: () {
-                        // TODO: Implement language selection
-                      },
-                    ),
-                  ],
+                Text(
+                  _nameCtrl.text.isEmpty ? 'User' : _nameCtrl.text,
+                  style: GoogleFonts.inter(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.grey[800],
+                  ),
                 ),
-                SizedBox(height: 24.h),
-                _buildSectionTitle('Security'),
-                _buildSettingsCard(
-                  children: [
-                    _buildSettingsTile(
-                      icon: Icons.lock_outline,
-                      title: 'Change Password',
-                      subtitle: 'Update your login password',
-                      onTap: () {
-                        // TODO: Implement change password flow
-                      },
-                    ),
-                    _buildSettingsTile(
-                      icon: Icons.phonelink_lock_outlined,
-                      title: 'Two-Factor Authentication',
-                      subtitle: 'Add an extra layer of security',
-                      onTap: () {
-                        // TODO: Implement 2FA setup
-                      },
-                    ),
-                  ],
-                ),
-                SizedBox(height: 24.h),
-                _buildSectionTitle('About'),
-                _buildSettingsCard(
-                  children: [
-                    _buildSettingsTile(
-                      icon: Icons.info_outline,
-                      title: 'App Version',
-                      subtitle: '1.0.0',
-                    ),
-                    _buildSettingsTile(
-                      icon: Icons.description_outlined,
-                      title: 'Terms of Service',
-                      onTap: () {},
-                    ),
-                    _buildSettingsTile(
-                      icon: Icons.privacy_tip_outlined,
-                      title: 'Privacy Policy',
-                      onTap: () {},
-                    ),
-                  ],
+                SizedBox(height: 4.h),
+                Text(
+                  _usernameCtrl.text.isEmpty ? 'username' : _usernameCtrl.text,
+                  style: GoogleFonts.inter(color: isDark ? primary : primary),
                 ),
               ],
             ),
           ),
+          IconButton(
+            onPressed: _openEditProfile,
+            icon: Icon(
+              Icons.edit,
+              color: isDark ? Colors.white : Colors.grey[800],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _preferencesCard(Color cardColor, Color primary) {
+    final theme = Provider.of<ThemeProvider>(context);
+    final themeLabel = theme.themeMode == ThemeMode.dark ? 'Dark' : 'Light';
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF2C2C2C), Color(0xFF1A1A1A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black26,
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey.shade600.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: Theme.of(context).brightness == Brightness.light
+                ? 12
+                : 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          const Icon(Icons.settings_outlined, color: Colors.white, size: 32),
-          SizedBox(width: 16.w),
-          Text(
-            'Settings',
-            style: GoogleFonts.poppins(
-              fontSize: 22.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+          _tile(
+            icon: Icons.color_lens_outlined,
+            title: 'Appearance',
+            subtitle: 'Theme: $themeLabel',
+            onTap: _openThemePicker,
+            primary: primary,
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12.h),
-      child: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: 16.sp,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey[800],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileCard(Admin? admin) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-      shadowColor: const Color(0xFFB48F85).withOpacity(0.1),
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 30.r,
-              backgroundColor: const Color(0xFFF1E6E3),
-              child: Icon(
-                Icons.person_outline,
-                size: 30.r,
-                color: const Color(0xFFB48F85),
-              ),
-            ),
-            SizedBox(width: 16.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    admin?.fullName ?? 'Admin User',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    admin?.username ?? 'admin',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14.sp,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, color: Color(0xFFB48F85)),
-              onPressed: () {
-                // TODO: Implement edit profile action
+          _tile(
+            icon: Icons.notifications_outlined,
+            title: 'Notifications',
+            subtitle: 'Manage push and email notifications',
+            trailing: Switch(
+              value: _notifications,
+              onChanged: (val) async {
+                setState(() => _notifications = val);
+                await _persistProfile();
               },
             ),
-          ],
-        ),
+            primary: primary,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSettingsCard({required List<Widget> children}) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-      shadowColor: const Color(0xFFB48F85).withOpacity(0.1),
-      child: Column(children: children),
+  Widget _securityCard(Color cardColor, Color primary) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18.r),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey.shade600.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _tile(
+            icon: Icons.email_outlined,
+            title: 'Reset Password',
+            subtitle: 'Send password reset email',
+            onTap: _openResetPassword,
+            primary: primary,
+          ),
+          _tile(
+            icon: Icons.logout_outlined,
+            title: 'Logout',
+            subtitle: 'Sign out of your account',
+            onTap: _confirmLogout,
+            primary: primary,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildSettingsTile({
+  Future<void> _confirmLogout() async {
+    final should = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+
+    if (should != true) return;
+
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    await auth.logout();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Logged out')));
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  Widget _aboutCard(Color cardColor, Color primary) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18.r),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey.shade600.withValues(alpha: 0.5)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _tile(
+            icon: Icons.info_outline,
+            title: 'App Version',
+            subtitle: '1.0.0',
+            onTap: () {},
+            primary: primary,
+          ),
+          _tile(
+            icon: Icons.description_outlined,
+            title: 'Terms & Services',
+            subtitle: 'View the latest terms',
+            onTap: _openTerms,
+            primary: primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile({
     required IconData icon,
     required String title,
-    String? subtitle,
+    required String subtitle,
     VoidCallback? onTap,
+    Widget? trailing,
+    required Color primary,
   }) {
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFFB48F85)),
+      leading: Icon(icon, color: primary),
       title: Text(
         title,
-        style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+        style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: primary),
       ),
-      subtitle: subtitle != null
+      subtitle: subtitle.isNotEmpty
           ? Text(
               subtitle,
-              style: GoogleFonts.poppins(
-                color: Colors.grey[600],
-                fontSize: 12.sp,
-              ),
+              style: GoogleFonts.inter(color: primary.withOpacity(0.7)),
             )
           : null,
-      trailing: onTap != null
-          ? const Icon(Icons.chevron_right, color: Colors.grey)
-          : null,
+      trailing: trailing ?? Icon(Icons.chevron_right, color: primary),
       onTap: onTap,
+    );
+  }
+
+  Future<void> _openEditProfile() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 12.h,
+            left: 16.w,
+            right: 16.w,
+            top: 18.h,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sheetGrabber(),
+              SizedBox(height: 12.h),
+              _textField('Full name', _nameCtrl),
+              SizedBox(height: 10.h),
+              _textField('Username', _usernameCtrl),
+              SizedBox(height: 10.h),
+              _textField(
+                'Email',
+                _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              SizedBox(height: 10.h),
+              _textField(
+                'Phone number',
+                _phoneCtrl,
+                keyboardType: TextInputType.phone,
+              ),
+              SizedBox(height: 10.h),
+              _textField('Address', _addressCtrl, maxLines: 2),
+              SizedBox(height: 16.h),
+              ElevatedButton(
+                onPressed: _savingProfile
+                    ? null
+                    : () async {
+                        if (!mounted) return;
+                        setState(() => _savingProfile = true);
+
+                        final auth = Provider.of<AuthProvider>(
+                          context,
+                          listen: false,
+                        );
+
+                        final updated = await auth.updateProfile(
+                          fullName: _nameCtrl.text.trim(),
+                          username: _usernameCtrl.text.trim(),
+                          email: _emailCtrl.text.trim().isEmpty
+                              ? null
+                              : _emailCtrl.text.trim(),
+                          phoneNumber: _phoneCtrl.text.trim().isEmpty
+                              ? null
+                              : _phoneCtrl.text.trim(),
+                          address: _addressCtrl.text.trim().isEmpty
+                              ? null
+                              : _addressCtrl.text.trim(),
+                        );
+
+                        if (!mounted) return;
+                        setState(() => _savingProfile = false);
+
+                        if (updated != null) {
+                          await _persistProfile();
+                          if (!mounted) return;
+                          Navigator.pop(ctx);
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Profile updated')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                auth.errorMessage ?? 'Unable to update profile',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(double.infinity, 48.h),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).elevatedButtonTheme.style?.backgroundColor?.resolve({}),
+                ),
+                child: _savingProfile
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Open a bottom sheet to request an email address and send a Firebase
+  /// password reset link. Uses [FirebaseAuthService.sendPasswordResetEmail].
+  Future<void> _openResetPassword() async {
+    final emailCtrl = TextEditingController(text: _emailCtrl.text);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 12.h,
+            left: 16.w,
+            right: 16.w,
+            top: 18.h,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sheetGrabber(),
+              SizedBox(height: 12.h),
+              _textField(
+                'Email',
+                emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              SizedBox(height: 16.h),
+              ElevatedButton(
+                onPressed: () async {
+                  final email = emailCtrl.text.trim();
+                  if (email.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter your email')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    final fb = FirebaseAuthService();
+                    await fb.sendPasswordResetEmail(email);
+                    if (mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Password reset email sent'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    final message = e is Exception
+                        ? e.toString().replaceFirst('Exception: ', '')
+                        : 'Failed to send password reset email';
+                    if (mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(double.infinity, 48.h),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).elevatedButtonTheme.style?.backgroundColor?.resolve({}),
+                ),
+                child: const Text('Send reset email'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _textField(
+    String label,
+    TextEditingController controller, {
+    bool obscure = false,
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
+
+  Widget _sheetGrabber() {
+    return Container(
+      width: 44.w,
+      height: 4.h,
+      decoration: BoxDecoration(
+        color: Theme.of(context).dividerColor,
+        borderRadius: BorderRadius.circular(6.r),
+      ),
+    );
+  }
+
+  Future<void> _openTerms() async {
+    const termsText =
+        'By using this application, you agree to abide by the platform policies, maintain accurate account information, and comply with applicable laws. Data is processed in accordance with our privacy practices. Continued use constitutes acceptance of updates to these terms.';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sheetGrabber(),
+              SizedBox(height: 12.h),
+              Text(
+                'Terms & Services',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16.sp,
+                  color: Theme.of(context).textTheme.titleMedium?.color,
+                ),
+              ),
+              SizedBox(height: 10.h),
+              Text(
+                termsText,
+                style: GoogleFonts.inter(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
+              ),
+              SizedBox(height: 14.h),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openThemePicker() async {
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sheetGrabber(),
+              SizedBox(height: 12.h),
+              _themeOption('Light', ThemeMode.light, theme.themeMode, theme),
+              _themeOption('Dark', ThemeMode.dark, theme.themeMode, theme),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _themeOption(
+    String label,
+    ThemeMode value,
+    ThemeMode current,
+    ThemeProvider provider,
+  ) {
+    return ListTile(
+      leading: Icon(
+        value == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode,
+      ),
+      title: Text(label, style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+      trailing: Radio<ThemeMode>(
+        value: value,
+        groupValue: current,
+        onChanged: (mode) async {
+          if (mode == null) return;
+          await provider.setThemeMode(mode);
+          if (mounted) Navigator.pop(context);
+        },
+      ),
+      onTap: () async {
+        await provider.setThemeMode(value);
+        if (mounted) Navigator.pop(context);
+      },
     );
   }
 }

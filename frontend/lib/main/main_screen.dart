@@ -1,3 +1,4 @@
+//main_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,11 +7,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import 'dashboard_screen.dart';
 import 'categories_screen.dart';
-import 'products_screen.dart';
-import 'reports_screen.dart';
-import 'chat_screen.dart';
-import 'billing_screen.dart';
 import 'customers_screen.dart';
+import 'billing_screen.dart';
 import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -24,46 +22,30 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   late PageController _pageController;
 
+  // Responsive breakpoints
+  static const double _tabletBreakpoint = 768;
+  static const double _desktopBreakpoint = 1024;
+
   final List<MainScreenItem> _screens = [
     MainScreenItem(
       title: 'Dashboard',
-      icon: Icons.dashboard_rounded,
+      icon: Icons.home_outlined,
       screen: const DashboardScreen(),
     ),
     MainScreenItem(
       title: 'Categories',
-      icon: Icons.category_rounded,
+      icon: Icons.category_outlined,
       screen: const CategoriesScreen(),
     ),
     MainScreenItem(
-      title: 'Products',
-      icon: Icons.inventory_2_rounded,
-      screen: const AllProductsScreen(),
-    ),
-    MainScreenItem(
-      title: 'Billing',
-      icon: Icons.receipt_long_rounded,
-      screen: const BillingScreen(),
-    ),
-    MainScreenItem(
       title: 'Customers',
-      icon: Icons.people_rounded,
+      icon: Icons.people_outline,
       screen: const CustomersScreen(),
     ),
     MainScreenItem(
-      title: 'Reports',
-      icon: Icons.analytics_rounded,
-      screen: const ReportsScreen(),
-    ),
-    MainScreenItem(
-      title: 'AI Assistant',
-      icon: Icons.smart_toy_rounded,
-      screen: const ChatScreen(),
-    ),
-    MainScreenItem(
-      title: 'Settings',
-      icon: Icons.settings_rounded,
-      screen: const SettingsScreen(),
+      title: 'Billing',
+      icon: Icons.receipt_outlined,
+      screen: const BillingScreen(),
     ),
   ];
 
@@ -90,253 +72,438 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    if (screenWidth < _tabletBreakpoint) {
+      return _buildMobileLayout();
+    } else if (screenWidth < _desktopBreakpoint) {
+      return _buildTabletLayout();
+    } else {
+      return _buildDesktopLayout();
+    }
+  }
+
+  Widget _buildMobileLayout() {
     return Scaffold(
-      body: Row(
-        children: [
-          _buildSidebar(),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              children: _screens.map((item) => item.screen).toList(),
-            ),
-          ),
-        ],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: _buildLuxuryAppBar(),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        children: _screens.map((item) => item.screen).toList(),
       ),
+      bottomNavigationBar: _buildLuxuryBottomNav(),
     );
   }
 
-  Widget _buildSidebar() {
-    return Container(
-      width: 240.w,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF1E40AF)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+  AppBar _buildLuxuryAppBar() {
+    return AppBar(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      centerTitle: false,
+      title: Text(
+        'Balaji',
+        style: TextStyle(
+          fontFamily: 'Georgia',
+          fontSize: 28.sp,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1,
+          color: const Color(0xFF8B6F47),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(3, 0),
-          ),
-        ],
       ),
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: EdgeInsets.fromLTRB(20.w, 32.h, 20.w, 20.h),
-            child: Column(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(12.w),
+      actions: [
+        Consumer<AuthProvider>(
+          builder: (context, auth, child) {
+            return Padding(
+              padding: EdgeInsets.only(right: 16.w),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+                child: Container(
+                  width: 38.w,
+                  height: 38.w,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Theme.of(context).cardColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.diamond_rounded,
-                      size: 32.w, color: Colors.white),
-                ),
-                SizedBox(height: 12.h),
-                Text(
-                  'Balaji Imitation',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                  child: Icon(
+                    Icons.person_outline,
+                    size: 22.w,
+                    color: Theme.of(context).iconTheme.color,
                   ),
                 ),
-                Text(
-                  'Admin Panel',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11.sp,
-                    color: Colors.white60,
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLuxuryBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.white.withOpacity(0.1)
+                : Theme.of(context).dividerColor.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 6.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(
+              _screens.length,
+              (index) => _luxuryNavItem(
+                icon: _screens[index].icon,
+                label: _screens[index].title,
+                isSelected: _currentIndex == index,
+                onTap: () {
+                  setState(() => _currentIndex = index);
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _luxuryNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.light
+              ? Colors.white
+              : Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(12.r),
+          boxShadow: Theme.of(context).brightness == Brightness.light
+              ? [
+                  BoxShadow(
+                    color: isSelected
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.1),
+                    blurRadius: isSelected ? 8 : 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24.sp,
+              color: isSelected
+                  ? const Color(0xFF8B6F47)
+                  : (Theme.of(context).brightness == Brightness.light
+                        ? Colors.grey[800]!.withValues(alpha: 0.6)
+                        : Theme.of(
+                            context,
+                          ).iconTheme.color?.withValues(alpha: 0.6)),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? const Color(0xFF8B6F47)
+                    : (Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[800]!.withValues(alpha: 0.6)
+                          : Theme.of(context).textTheme.bodySmall?.color
+                                ?.withValues(alpha: 0.6)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabletLayout() {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Row(
+        children: [
+          // Side Navigation
+          Container(
+            width: 280,
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey.shade300.withValues(alpha: 0.5)
+                      : Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(2, 0),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Balaji',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                          color: const Color(0xFF8B6F47),
+                        ),
+                      ),
+                      const Spacer(),
+                      _buildUserAvatar(),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Navigation Items
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _screens.length,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemBuilder: (context, index) {
+                      return _buildSideNavItem(
+                        icon: _screens[index].icon,
+                        label: _screens[index].title,
+                        isSelected: _currentIndex == index,
+                        onTap: () => setState(() => _currentIndex = index),
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
+          // Main Content
+          Expanded(child: _screens[_currentIndex].screen),
+        ],
+      ),
+    );
+  }
 
-          Divider(color: Colors.white.withOpacity(0.15), height: 1),
-          SizedBox(height: 8.h),
-
-          // Navigation Items
-          Expanded(
-            child: ListView.builder(
-              itemCount: _screens.length,
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-              itemBuilder: (context, index) {
-                final item = _screens[index];
-                final isSelected = _currentIndex == index;
-                final isAI = item.title == 'AI Assistant';
-
-                return Container(
-                  margin: EdgeInsets.symmetric(vertical: 2.h),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _currentIndex = index;
-                        });
-                        _pageController.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(10.r),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14.w,
-                          vertical: 11.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.white.withOpacity(0.18)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: isAI && !isSelected
-                              ? Border.all(
-                                  color:
-                                      const Color(0xFF60A5FA).withOpacity(0.4),
-                                  width: 1,
-                                )
-                              : null,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              item.icon,
-                              size: 18.w,
-                              color: isSelected
-                                  ? Colors.white
-                                  : isAI
-                                      ? const Color(0xFF93C5FD)
-                                      : Colors.white60,
-                            ),
-                            SizedBox(width: 10.w),
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13.sp,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : isAI
-                                          ? const Color(0xFF93C5FD)
-                                          : Colors.white70,
-                                ),
-                              ),
-                            ),
-                            if (isAI)
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 6.w, vertical: 2.h),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF3B82F6)
-                                      .withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(6.r),
-                                ),
-                                child: Text('AI',
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 8.sp,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // User Info and Logout
+  Widget _buildDesktopLayout() {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Row(
+        children: [
+          // Expanded Side Navigation
           Container(
-            padding: EdgeInsets.all(14.w),
+            width: 320,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.1),
-              border: Border(
-                top: BorderSide(
-                    color: Colors.white.withOpacity(0.15), width: 1),
-              ),
+              color: Theme.of(context).cardColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey.shade300.withValues(alpha: 0.5)
+                      : Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 15,
+                  offset: const Offset(2, 0),
+                ),
+              ],
             ),
             child: Column(
               children: [
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18.r,
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          child: Icon(
-                            Icons.person_rounded,
-                            color: Colors.white,
-                            size: 18.w,
+                // Enhanced Header
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF8B6F47,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.diamond_outlined,
+                              color: Color(0xFF8B6F47),
+                              size: 32,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 10.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                authProvider.currentAdmin?.fullName ?? 'Admin',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 11.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Balaji',
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                    color: const Color(0xFF8B6F47),
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                authProvider.currentAdmin?.username ?? '',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 9.sp,
-                                  color: Colors.white60,
+                                Text(
+                                  'Jewelry Management',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? Colors.grey[600]
+                                        : Colors.white70,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                SizedBox(height: 10.h),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _handleLogout,
-                    icon: Icon(Icons.logout_rounded, size: 14.w),
-                    label: Text(
-                      'Logout',
-                      style: GoogleFonts.poppins(fontSize: 12.sp),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 8.h),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
+                        ],
                       ),
-                    ),
+
+                      // _buildUserAvatar(), // Settings icon removed from desktop sidebar
+                    ],
                   ),
                 ),
+                const Divider(),
+                // Navigation Items
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _screens.length,
+                    padding: const EdgeInsets.all(16),
+                    itemBuilder: (context, index) {
+                      return _buildDesktopNavItem(
+                        icon: _screens[index].icon,
+                        label: _screens[index].title,
+                        isSelected: _currentIndex == index,
+                        onTap: () => setState(() => _currentIndex = index),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Main Content Area
+          Expanded(
+            child: Column(
+              children: [
+                // Top Bar
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Colors.grey.shade200.withValues(alpha: 0.5)
+                            : Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 5,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        _screens[_currentIndex].title,
+                        style: GoogleFonts.roboto(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[800]
+                              : Colors.white,
+                        ),
+                      ),
+                      const Spacer(),
+                      Consumer<AuthProvider>(
+                        builder: (context, auth, child) {
+                          return IconButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen(),
+                                ),
+                              );
+                            },
+                            tooltip: 'Settings',
+                            icon: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.light
+                                    ? Colors.grey[100]
+                                    : Colors.grey[800],
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? Colors.grey.shade300.withValues(
+                                            alpha: 0.5,
+                                          )
+                                        : Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.settings_outlined,
+                                size: 24,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                // Content
+                Expanded(child: _screens[_currentIndex].screen),
               ],
             ),
           ),
@@ -345,16 +512,135 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Future<void> _handleLogout() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.logout();
+  // Helper Widgets for Navigation
+  Widget _buildUserAvatar() {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, child) {
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
+          },
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Colors.grey[100]
+                  : Colors.grey[800],
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.settings_outlined,
+              size: 20,
+              color: Theme.of(context).iconTheme.color,
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
+  Widget _buildSideNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? const Color(0xFF8B6F47).withValues(alpha: 0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isSelected
+              ? const Color(0xFF8B6F47)
+              : (Theme.of(context).brightness == Brightness.light
+                    ? Colors.grey[600]
+                    : Colors.white70),
+        ),
+        title: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            color: isSelected
+                ? const Color(0xFF8B6F47)
+                : (Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[700]
+                      : Colors.white),
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildDesktopNavItem({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? const Color(0xFF8B6F47).withValues(alpha: 0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border: isSelected
+            ? Border.all(color: const Color(0xFF8B6F47).withValues(alpha: 0.3))
+            : null,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF8B6F47).withValues(alpha: 0.2)
+                : (Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[100]
+                      : Colors.grey[800]),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: isSelected
+                ? const Color(0xFF8B6F47)
+                : (Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[600]
+                      : Colors.white70),
+          ),
+        ),
+        title: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected
+                ? const Color(0xFF8B6F47)
+                : (Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[700]
+                      : Colors.white),
+          ),
+        ),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
   }
 }
 
+// SCREEN HOLDER MODEL
 class MainScreenItem {
   final String title;
   final IconData icon;
@@ -365,75 +651,4 @@ class MainScreenItem {
     required this.icon,
     required this.screen,
   });
-}
-
-// ─── All Products Screen (sidebar entry — guides user to categories) ─────────
-class AllProductsScreen extends StatelessWidget {
-  const AllProductsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                    color: Color(0xFFE2E8F0),
-                    blurRadius: 4,
-                    offset: Offset(0, 2))
-              ],
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.inventory_2_rounded,
-                    color: const Color(0xFF1E3A8A), size: 26.w),
-                SizedBox(width: 12.w),
-                Text(
-                  'Products',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24.sp,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E3A8A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.category_rounded,
-                      size: 64.w,
-                      color: const Color(0xFF3B82F6).withOpacity(0.5)),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'Select a Category to View Products',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1E3A8A),
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    'Go to Categories → tap a category → manage its products',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13.sp, color: Colors.grey.shade500),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

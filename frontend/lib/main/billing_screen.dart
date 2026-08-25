@@ -1,10 +1,13 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../models/bill.dart';
+import '../models/customer.dart';
+import '../models/product.dart';
+import '../services/bill_service.dart';
+import '../services/customer_service.dart';
+import '../services/product_service.dart';
+import '../services/pdf_sevice.dart';
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -13,254 +16,526 @@ class BillingScreen extends StatefulWidget {
   State<BillingScreen> createState() => _BillingScreenState();
 }
 
-class _BillingScreenState extends State<BillingScreen>
-    with SingleTickerProviderStateMixin {
-  final TextEditingController _searchController = TextEditingController();
-  final List<_InvoiceViewModel> _allInvoices = [];
-  final List<String> _statusFilters = ['All', 'Paid', 'Pending', 'Overdue'];
+class _BillingScreenState extends State<BillingScreen> {
+  final BillService _billService = BillService();
+  final CustomerService _customerService = CustomerService();
+  final ProductService _productService = ProductService();
+  final PDFService _pdfService = PDFService();
 
-  String _selectedStatus = 'All';
-  String _selectedSort = 'Newest';
-  DateTimeRange? _selectedRange;
-  bool _isLoading = true;
+  bool _loading = false;
+  String? _error;
 
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  List<BillRecord> _bills = [];
+  List<Customer> _customers = [];
 
-  List<_InvoiceViewModel> get _visibleInvoices => _filterAndSortInvoices();
+  String _search = '';
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-    _bootstrap();
+    _loadAll();
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _bootstrap() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    _allInvoices
-      ..clear()
-      ..addAll(_generateMockInvoices());
-    setState(() => _isLoading = false);
-    _animationController.forward();
-  }
-
-  List<_InvoiceViewModel> _filterAndSortInvoices() {
-    Iterable<_InvoiceViewModel> data = _allInvoices;
-
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isNotEmpty) {
-      data = data.where(
-        (invoice) =>
-            invoice.bill.billNumber.toLowerCase().contains(query) ||
-            invoice.customerName.toLowerCase().contains(query),
-      );
-    }
-
-    if (_selectedStatus != 'All') {
-      data = data.where(
-        (invoice) =>
-            invoice.bill.paymentStatus.toLowerCase() ==
-            _selectedStatus.toLowerCase(),
-      );
-    }
-
-    if (_selectedRange != null) {
-      data = data.where(
-        (invoice) =>
-            invoice.bill.billDate.isAfter(
-              _selectedRange!.start.subtract(const Duration(days: 1)),
-            ) &&
-            invoice.bill.billDate.isBefore(
-              _selectedRange!.end.add(const Duration(days: 1)),
-            ),
-      );
-    }
-
-    final list = data.toList();
-
-    switch (_selectedSort) {
-      case 'Newest':
-        list.sort((a, b) => b.bill.billDate.compareTo(a.bill.billDate));
-        break;
-      case 'Oldest':
-        list.sort((a, b) => a.bill.billDate.compareTo(b.bill.billDate));
-        break;
-      case 'Amount High':
-        list.sort((a, b) => b.bill.totalAmount.compareTo(a.bill.totalAmount));
-        break;
-      case 'Amount Low':
-        list.sort((a, b) => a.bill.totalAmount.compareTo(b.bill.totalAmount));
-        break;
-    }
-
-    return list;
-  }
-
-  double get _totalRevenue => _visibleInvoices.fold(
-    0,
-    (previousValue, element) => previousValue + element.bill.totalAmount,
-  );
-
-  int get _pendingCount => _visibleInvoices
-      .where((invoice) => invoice.bill.paymentStatus.toLowerCase() == 'pending')
-      .length;
-
-  int get _overdueCount => _visibleInvoices
-      .where((invoice) => invoice.bill.paymentStatus.toLowerCase() == 'overdue')
-      .length;
-
-  int get _paidCount => _visibleInvoices
-      .where((invoice) => invoice.bill.paymentStatus.toLowerCase() == 'paid')
-      .length;
-
-  Future<void> _pickDateRange() async {
-    final now = DateTime.now();
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 1),
-      initialDateRange: _selectedRange,
-    );
-
-    if (picked != null) {
-      setState(() => _selectedRange = picked);
+  Future<void> _loadAll() async {
+    setState(() => _loading = true);
+    try {
+      final results = await Future.wait([
+        _billService.getBills(),
+        _customerService.getAllCustomers(),
+      ]);
+      _bills = results[0] as List<BillRecord>;
+      _customers = results[1] as List<Customer>;
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _clearFilters() {
-    setState(() {
-      _selectedStatus = 'All';
-      _selectedSort = 'Newest';
-      _selectedRange = null;
-      _searchController.clear();
-    });
-  }
+  // ================= CREATE BILL =================
+  void _openCreateBillSheet() {
+    Customer? selectedCustomer;
+    Product? selectedProduct;
+    DateTime billDate = DateTime.now();
+    String paymentStatus = 'pending';
+    List<Customer> remoteSuggestions = [];
+    bool searchingCustomers = false;
 
-  void _showInvoiceDetails(_InvoiceViewModel invoice) {
-    showModalBottomSheet<void>(
+    // Customer controllers
+    final customerSearchCtrl = TextEditingController();
+    final customerPhoneCtrl = TextEditingController();
+    final customerEmailCtrl = TextEditingController();
+    final customerAddressCtrl = TextEditingController();
+
+    // Product + totals controllers
+    final productCodeCtrl = TextEditingController();
+    final gstCtrl = TextEditingController(text: '0');
+    final discountCtrl = TextEditingController(text: '0');
+    final notesCtrl = TextEditingController();
+
+    int quantity = 1;
+    final List<_BillLine> lines = [];
+
+    double subtotal() => lines.fold(0.0, (sum, l) => sum + l.totalPrice);
+
+    double gstAmount() =>
+        subtotal() * ((double.tryParse(gstCtrl.text.trim()) ?? 0) / 100);
+
+    double discountAmount() => double.tryParse(discountCtrl.text.trim()) ?? 0;
+
+    double total() => subtotal() + gstAmount() - discountAmount();
+
+    showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          maxChildSize: 0.9,
-          initialChildSize: 0.75,
-          minChildSize: 0.6,
-          builder: (context, scrollController) {
-            return Container(
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            final displayBillNumber =
+                'BILL-${(_bills.length + 1).toString().padLeft(4, '0')}';
+
+            final query = customerSearchCtrl.text.trim();
+
+            Future<void> fetchCustomerSuggestions(String q) async {
+              if (q.isEmpty) {
+                setSheet(() => remoteSuggestions = []);
+                return;
+              }
+              setSheet(() => searchingCustomers = true);
+              try {
+                final results = await _customerService.searchCustomers(q);
+                setSheet(() {
+                  remoteSuggestions = results.take(8).toList();
+                });
+              } finally {
+                setSheet(() => searchingCustomers = false);
+              }
+            }
+
+            final localMatches = _customers
+                .where(
+                  (c) =>
+                      c.name.toLowerCase().contains(query.toLowerCase()) ||
+                      c.phoneNumber.toLowerCase().contains(query),
+                )
+                .take(8)
+                .toList();
+
+            final customerSuggestions = query.isEmpty
+                ? localMatches
+                : (remoteSuggestions.isNotEmpty
+                      ? remoteSuggestions
+                      : localMatches);
+
+            Future<void> fetchProduct(String code) async {
+              final trimmed = code.trim();
+              if (trimmed.isEmpty) return;
+              try {
+                final p = await _productService.getProductByCode(trimmed);
+                if (p == null) {
+                  setSheet(() => selectedProduct = null);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Product not found')),
+                  );
+                  return;
+                }
+                setSheet(() {
+                  selectedProduct = p;
+                  quantity = 1;
+                });
+              } catch (err) {
+                setSheet(() => selectedProduct = null);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error fetching product: $err')),
+                );
+              }
+            }
+
+            void addItem() {
+              if (selectedProduct == null) return;
+
+              if (quantity > selectedProduct!.stockQuantity) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Out of stock. Only ${selectedProduct!.stockQuantity} available',
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              lines.add(
+                _BillLine(product: selectedProduct!, quantity: quantity),
+              );
+
+              selectedProduct = null;
+              productCodeCtrl.clear();
+              quantity = 1;
+              setSheet(() {});
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 16.w,
+                right: 16.w,
+                top: 16.h,
               ),
               child: SingleChildScrollView(
-                controller: scrollController,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
                       child: Container(
-                        height: 6.h,
-                        width: 60.w,
+                        width: 48.w,
+                        height: 5.h,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(3.r),
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(6.r),
                         ),
                       ),
                     ),
-                    SizedBox(height: 16.h),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(12.w),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1E6E3),
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: const Icon(
-                            Icons.receipt_long,
-                            color: Color(0xFFB48F85),
-                          ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Create Invoice',
+                      style: GoogleFonts.inter(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Colors.grey[800]
+                            : const Color(0xFF4A3B2A),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+
+                    // Bill number (display only)
+                    _infoRow('Invoice Number', displayBillNumber),
+                    SizedBox(height: 12.h),
+
+                    // Customer search + autofill
+                    TextField(
+                      controller: customerSearchCtrl,
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Colors.grey[800]
+                            : Colors.white,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Customer Name',
+                        labelStyle: TextStyle(
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[600]
+                              : Colors.white70,
                         ),
-                        SizedBox(width: 16.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                invoice.bill.billNumber,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 20.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF3A3A3A),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                              ? Colors.grey[600]
+                              : Colors.white70,
+                        ),
+                      ),
+                      onChanged: (v) {
+                        setSheet(() {});
+                        fetchCustomerSuggestions(v);
+                      },
+                    ),
+                    if (customerSuggestions.isNotEmpty)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(10.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: customerSuggestions.map((c) {
+                            return ListTile(
+                              title: Text(
+                                c.name,
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.light
+                                      ? Colors.grey[800]
+                                      : Colors.white,
                                 ),
                               ),
-                              SizedBox(height: 4.h),
-                              Text(
-                                'Issued on · ${_formatDate(invoice.bill.billDate)}',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12.sp,
-                                  color: Colors.grey[600],
+                              subtitle: Text(
+                                c.phoneNumber,
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.light
+                                      ? Colors.grey[600]
+                                      : Colors.white70,
                                 ),
+                              ),
+                              onTap: () {
+                                selectedCustomer = c;
+                                customerSearchCtrl.text = c.name;
+                                customerPhoneCtrl.text = c.phoneNumber;
+                                customerEmailCtrl.text = c.email;
+                                customerAddressCtrl.text = c.address;
+                                FocusScope.of(context).unfocus();
+                                setSheet(() {});
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    if (searchingCustomers)
+                      Padding(
+                        padding: EdgeInsets.only(top: 6.h),
+                        child: const LinearProgressIndicator(minHeight: 2),
+                      ),
+                    SizedBox(height: 8.h),
+                    _readonlyField('Customer Contact', customerPhoneCtrl),
+                    _readonlyField('Customer Email', customerEmailCtrl),
+                    _readonlyField(
+                      'Customer Address',
+                      customerAddressCtrl,
+                      maxLines: 2,
+                    ),
+
+                    SizedBox(height: 12.h),
+
+                    // Date + payment status
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: billDate,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) {
+                                setSheet(() => billDate = picked);
+                              }
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 12.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.light
+                                    ? Colors.white
+                                    : Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.light
+                                      ? Colors.grey.shade300
+                                      : Colors.white12,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today_rounded,
+                                    size: 18,
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? Colors.grey[800]
+                                        : Colors.white,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    '${billDate.day} ${_monthName(billDate.month)} ${billDate.year}',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.light
+                                          ? Colors.grey[800]
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: paymentStatus,
+                            decoration: const InputDecoration(
+                              labelText: 'Payment Status',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'pending',
+                                child: Text('Pending'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'paid',
+                                child: Text('Paid'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'unpaid',
+                                child: Text('Unpaid'),
                               ),
                             ],
+                            onChanged: (v) {
+                              if (v != null) setSheet(() => paymentStatus = v);
+                            },
                           ),
                         ),
-                        _buildStatusChip(invoice.bill.paymentStatus),
                       ],
                     ),
-                    SizedBox(height: 24.h),
+
+                    SizedBox(height: 16.h),
                     Text(
-                      'Customer Information',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF3A3A3A),
+                      'Line Items',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF4A3B2A),
                       ),
                     ),
-                    SizedBox(height: 12.h),
-                    _buildDetailRow(label: 'Name', value: invoice.customerName),
-                    _buildDetailRow(
-                      label: 'Contact',
-                      value: invoice.customerContact,
-                    ),
-                    _buildDetailRow(
-                      label: 'Email',
-                      value: invoice.customerEmail,
-                    ),
-                    SizedBox(height: 24.h),
-                    Text(
-                      'Items',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF3A3A3A),
+                    SizedBox(height: 8.h),
+
+                    // Product search
+                    TextField(
+                      controller: productCodeCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Product Unique Code',
+                        prefixIcon: Icon(Icons.qr_code_2),
                       ),
+                      onSubmitted: fetchProduct,
+                      onChanged: (_) => setSheet(() => selectedProduct = null),
                     ),
-                    SizedBox(height: 12.h),
-                    ...invoice.items.map(
-                      (item) => Container(
-                        margin: EdgeInsets.only(bottom: 12.h),
-                        padding: EdgeInsets.all(14.w),
+                    if (selectedProduct != null) ...[
+                      SizedBox(height: 8.h),
+                      _infoRow('Product', selectedProduct!.name),
+                      _infoRow('Description', selectedProduct!.description),
+                      _infoRow(
+                        'Category',
+                        selectedProduct!.categoryName ?? 'N/A',
+                      ),
+                      _infoRow('Price', '₹${selectedProduct!.price}'),
+                      _infoRow(
+                        'Available',
+                        '${selectedProduct!.stockQuantity}',
+                      ),
+                    ],
+                    SizedBox(height: 8.h),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.remove_circle_outline,
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                ? Colors.grey[600]
+                                : Colors.white70,
+                          ),
+                          onPressed: quantity > 1
+                              ? () => setSheet(() => quantity--)
+                              : null,
+                        ),
+                        Text(
+                          quantity.toString(),
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16.sp,
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                ? Colors.grey[800]
+                                : Colors.white,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.add_circle_outline,
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                ? Colors.grey[600]
+                                : Colors.white70,
+                          ),
+                          onPressed:
+                              selectedProduct != null &&
+                                  quantity < selectedProduct!.stockQuantity
+                              ? () => setSheet(() => quantity++)
+                              : null,
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.add, color: Colors.white),
+                          onPressed: addItem,
+                          label: Text(
+                            'Add item',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF8B6F47),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (selectedProduct != null &&
+                        quantity > selectedProduct!.stockQuantity)
+                      Padding(
+                        padding: EdgeInsets.only(top: 4.h),
+                        child: Text(
+                          'Only ${selectedProduct!.stockQuantity} available',
+                          style: GoogleFonts.inter(color: Colors.red),
+                        ),
+                      ),
+
+                    SizedBox(height: 10.h),
+                    ...lines.map(
+                      (l) => Container(
+                        margin: EdgeInsets.symmetric(vertical: 4.h),
+                        padding: EdgeInsets.all(12.w),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFAF7F6),
-                          borderRadius: BorderRadius.circular(14.r),
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                              ? Colors.white
+                              : Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                ? Colors.grey.shade200
+                                : Colors.grey.shade700,
+                          ),
+                          boxShadow:
+                              Theme.of(context).brightness == Brightness.light
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.grey.shade600.withValues(
+                                      alpha: 0.4,
+                                    ),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
                         ),
                         child: Row(
                           children: [
@@ -269,137 +544,146 @@ class _BillingScreenState extends State<BillingScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    item.name,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14.sp,
-                                      fontWeight: FontWeight.w600,
+                                    l.product.name,
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  SizedBox(height: 4.h),
+                                  if (l.product.categoryName != null)
+                                    Text(
+                                      l.product.categoryName!,
+                                      style: GoogleFonts.inter(
+                                        color: Colors.grey,
+                                        fontSize: 12.sp,
+                                      ),
+                                    ),
                                   Text(
-                                    '${item.quantity} pcs · ₹${item.unitPrice.toStringAsFixed(2)}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12.sp,
-                                      color: Colors.grey[600],
+                                    '${l.quantity} x ₹${l.product.price.toStringAsFixed(2)}',
+                                    style: GoogleFonts.inter(
+                                      color: Colors.grey,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             Text(
-                              '₹${item.totalPrice.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFFB48F85),
+                              '₹${l.totalPrice.toStringAsFixed(2)}',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    SizedBox(height: 16.h),
-                    Divider(color: Colors.grey[300]),
-                    SizedBox(height: 16.h),
-                    _buildSummaryRow('Subtotal', invoice.bill.subtotal),
-                    _buildSummaryRow('Tax', invoice.bill.taxAmount),
-                    _buildSummaryRow(
-                      'Discount',
-                      -invoice.bill.discountAmount,
-                      valueColor: Colors.red[400],
-                    ),
+
                     SizedBox(height: 12.h),
-                    Container(
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Grand Total',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '₹${invoice.bill.totalAmount.toStringAsFixed(2)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 20.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFB48F85),
-                            ),
-                          ),
-                        ],
-                      ),
+                    TextField(
+                      controller: gstCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'GST %'),
+                      onChanged: (_) => setSheet(() {}),
                     ),
-                    if (invoice.bill.notes != null &&
-                        invoice.bill.notes!.trim().isNotEmpty)
-                      Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.only(top: 12.h),
-                        padding: EdgeInsets.all(14.w),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1E6E3),
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: Text(
-                          invoice.bill.notes!,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.sp,
-                            color: const Color(0xFF6B5E54),
-                          ),
-                        ),
+                    TextField(
+                      controller: discountCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Discount (₹)',
                       ),
-                    SizedBox(height: 24.h),
+                      onChanged: (_) => setSheet(() {}),
+                    ),
+                    SizedBox(height: 6.h),
+                    _infoRow('Subtotal', '₹${subtotal().toStringAsFixed(2)}'),
+                    _infoRow('GST', '₹${gstAmount().toStringAsFixed(2)}'),
+                    _infoRow(
+                      'Total after discount',
+                      '₹${total().toStringAsFixed(2)}',
+                    ),
+
+                    SizedBox(height: 12.h),
+                    TextField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Additional Notes',
+                      ),
+                      maxLines: 3,
+                    ),
+
+                    SizedBox(height: 16.h),
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              _showEditInvoiceDialog(invoice);
-                            },
-                            icon: const Icon(Icons.edit_outlined),
-                            label: Text(
-                              'Edit Invoice',
-                              style: GoogleFonts.poppins(),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFB48F85),
-                              side: const BorderSide(color: Color(0xFFB48F85)),
-                              padding: EdgeInsets.symmetric(vertical: 12.h),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12.r),
-                              ),
-                            ),
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
                           ),
                         ),
                         SizedBox(width: 12.w),
                         Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                              _showMarkAsPaidDialog(invoice);
-                            },
-                            icon: const Icon(Icons.verified_outlined),
-                            label: Text(
-                              'Mark as Paid',
-                              style: GoogleFonts.poppins(),
-                            ),
+                          child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFB48F85),
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12.h),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12.r),
-                              ),
+                              backgroundColor: const Color(0xFF8B6F47),
+                              padding: EdgeInsets.symmetric(vertical: 14.h),
                             ),
+                            onPressed: () async {
+                              if (selectedCustomer == null || lines.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Select a customer and add items',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              try {
+                                await _billService.addBill(
+                                  customerId: selectedCustomer!.id!,
+                                  taxAmount: gstAmount(),
+                                  discountAmount: discountAmount(),
+                                  paymentStatus: paymentStatus,
+                                  notes: notesCtrl.text.trim().isEmpty
+                                      ? null
+                                      : notesCtrl.text.trim(),
+                                  items: lines
+                                      .map(
+                                        (l) => {
+                                          'productId': l.product.id,
+                                          'quantity': l.quantity,
+                                          'unitPrice': l.product.price,
+                                          'totalPrice': l.totalPrice,
+                                        },
+                                      )
+                                      .toList(),
+                                );
+
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                  await _loadAll();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Invoice created'),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: const Text('Create'),
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 16.h),
+                    SizedBox(height: 12.h),
                   ],
                 ),
               ),
@@ -410,663 +694,439 @@ class _BillingScreenState extends State<BillingScreen>
     );
   }
 
-  void _showCreateInvoiceSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _InvoiceFormSheet(
-          onSubmit: (invoice) {
-            setState(() => _allInvoices.insert(0, invoice));
-          },
-        );
-      },
-    );
-  }
-
-  void _showEditInvoiceDialog(_InvoiceViewModel invoice) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _InvoiceFormSheet(
-          existingInvoice: invoice,
-          onSubmit: (updated) {
-            final index = _allInvoices.indexWhere(
-              (element) => element.bill.billNumber == updated.bill.billNumber,
-            );
-            if (index != -1) {
-              setState(() => _allInvoices[index] = updated);
-            }
-          },
-        );
-      },
-    );
-  }
-
-  void _showMarkAsPaidDialog(_InvoiceViewModel invoice) {
-    if (invoice.bill.paymentStatus.toLowerCase() == 'paid') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Invoice is already marked as paid.',
-            style: GoogleFonts.poppins(color: Colors.white),
-          ),
-          backgroundColor: const Color(0xFFB48F85),
-        ),
-      );
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.r),
-          ),
-          title: Text(
-            'Mark as Paid',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          ),
-          content: Text(
-            'Are you sure you want to mark invoice ${invoice.bill.billNumber} as paid?',
-            style: GoogleFonts.poppins(fontSize: 14.sp),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: GoogleFonts.poppins()),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                setState(() {
-                  final index = _allInvoices.indexWhere(
-                    (element) =>
-                        element.bill.billNumber == invoice.bill.billNumber,
-                  );
-                  if (index != -1) {
-                    final updated = invoice.copyWith(
-                      bill: invoice.bill.copyWith(paymentStatus: 'Paid'),
-                    );
-                    _allInvoices[index] = updated;
-                  }
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB48F85),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-              ),
-              child: Text('Confirm', style: GoogleFonts.poppins()),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final filtered = _bills.where((b) {
+      if (_search.isEmpty) return true;
+      final q = _search.toLowerCase();
+      return b.bill.billNumber.toLowerCase().contains(q) ||
+          b.customerName.toLowerCase().contains(q);
+    }).toList();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F6),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF8B6F47),
+        onPressed: _openCreateBillSheet,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildFilterBar(),
-            _buildSummaryStrip(),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: _isLoading
-                    ? _buildLoadingState()
-                    : FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: _visibleInvoices.isEmpty
-                            ? _buildEmptyState()
-                            : _buildResponsiveListing(),
-                      ),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? Center(child: Text(_error!))
+            : Column(
+                children: [
+                  _header(),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No invoices yet. Tap + to create.',
+                              style: GoogleFonts.inter(color: Colors.grey[700]),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.only(
+                              top: 10.h,
+                              bottom:
+                                  MediaQuery.of(context).padding.bottom + 20.h,
+                            ),
+                            itemCount: filtered.length,
+                            itemBuilder: (ctx, i) {
+                              final bill = filtered[i].bill;
+                              final displayIndex = i + 1;
+                              return Card(
+                                margin: EdgeInsets.symmetric(
+                                  horizontal: 16.w,
+                                  vertical: 6.h,
+                                ),
+                                color: Theme.of(context).cardColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14.r),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    'INV-$displayIndex (${bill.billNumber})',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.light
+                                          ? Colors.grey[800]
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    filtered[i].customerName,
+                                    style: GoogleFonts.inter(
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.light
+                                          ? Colors.grey[600]
+                                          : Colors.white70,
+                                    ),
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '₹${bill.totalAmount.toStringAsFixed(2)}',
+                                            style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w700,
+                                              color:
+                                                  Theme.of(
+                                                        context,
+                                                      ).brightness ==
+                                                      Brightness.light
+                                                  ? Colors.grey[800]
+                                                  : Colors.white,
+                                            ),
+                                          ),
+                                          Text(
+                                            bill.paymentStatus.toUpperCase(),
+                                            style: GoogleFonts.inter(
+                                              color:
+                                                  bill.paymentStatus == 'paid'
+                                                  ? Colors.greenAccent
+                                                  : Colors.orangeAccent,
+                                              fontSize: 12.sp,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(width: 8.w),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.delete,
+                                          color:
+                                              Theme.of(context).brightness ==
+                                                  Brightness.light
+                                              ? Colors.grey[800]
+                                              : Colors.white,
+                                        ),
+                                        onPressed: () =>
+                                            _confirmDelete(bill.id!),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () => _openBillDetail(bill.id!),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showCreateInvoiceSheet,
-        backgroundColor: const Color(0xFFB48F85),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: Text(
-          'Create Invoice',
-          style: GoogleFonts.poppins(color: Colors.white),
-        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF2C2C2C), Color(0xFF1A1A1A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(14.w),
-            decoration: const BoxDecoration(
-              color: Color(0xFFB48F85),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.receipt_long,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Billing & Invoices',
-                style: GoogleFonts.poppins(
-                  fontSize: 22.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                'Track payments, generate invoices, and manage billing records',
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: Colors.white70,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          IconButton(
-            onPressed: () => _showExportDialog(),
-            icon: const Icon(Icons.download_outlined, color: Colors.white),
-          ),
-          IconButton(
-            onPressed: () => _showSettingsDialog(),
-            icon: const Icon(Icons.tune_outlined, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterBar() {
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+  Widget _header() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 8.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Container(
-                  height: 48.h,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFAF7F6),
-                    borderRadius: BorderRadius.circular(14.r),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (_) => setState(() {}),
-                    style: GoogleFonts.poppins(fontSize: 14.sp),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: Color(0xFFB48F85),
-                      ),
-                      hintText: 'Search by invoice number or customer name...',
-                      hintStyle: GoogleFonts.poppins(
-                        fontSize: 14.sp,
-                        color: Colors.grey[500],
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16.w,
-                        vertical: 10.h,
-                      ),
-                    ),
-                  ),
+              Text(
+                'Invoices',
+                style: GoogleFonts.roboto(
+                  fontSize: 28.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[800]
+                      : Colors.white,
                 ),
               ),
-              SizedBox(width: 12.w),
+              const Spacer(),
               IconButton(
-                onPressed: _clearFilters,
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                color: const Color(0xFFB48F85),
-                tooltip: 'Clear filters',
+                icon: Icon(
+                  Icons.picture_as_pdf,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[800]
+                      : Colors.white,
+                ),
+                onPressed: () {},
               ),
             ],
           ),
-          SizedBox(height: 14.h),
-          Wrap(
-            spacing: 10.w,
-            runSpacing: 10.h,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ..._statusFilters.map(
-                (status) => _buildChip(
-                  label: status,
-                  isActive: _selectedStatus == status,
-                  onSelected: () => setState(() => _selectedStatus = status),
-                ),
-              ),
-              _buildOutlinedButton(
-                icon: Icons.calendar_month_outlined,
-                label: _selectedRange == null
-                    ? 'Date Range'
-                    : '${_formatDate(_selectedRange!.start)} · ${_formatDate(_selectedRange!.end)}',
-                onPressed: _pickDateRange,
-              ),
-              PopupMenuButton<String>(
-                initialValue: _selectedSort,
-                onSelected: (value) => setState(() => _selectedSort = value),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'Newest', child: Text('Sort · Newest')),
-                  PopupMenuItem(value: 'Oldest', child: Text('Sort · Oldest')),
-                  PopupMenuItem(
-                    value: 'Amount High',
-                    child: Text('Amount · High to Low'),
-                  ),
-                  PopupMenuItem(
-                    value: 'Amount Low',
-                    child: Text('Amount · Low to High'),
-                  ),
-                ],
-                child: _buildMenuTriggerButton(
-                  icon: Icons.sort_outlined,
-                  label: _selectedSort,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryStrip() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 900;
-          final cards = [
-            _SummaryCardData(
-              title: 'Total Revenue',
-              value: '₹${_totalRevenue.toStringAsFixed(2)}',
-              subtitle: '${_visibleInvoices.length} invoices',
-              icon: Icons.trending_up,
-              gradient: const [Color(0xFFB48F85), Color(0xFF9A7A6F)],
-            ),
-            _SummaryCardData(
-              title: 'Paid Invoices',
-              value: _paidCount.toString(),
-              subtitle: 'Cleared payments',
-              icon: Icons.verified_outlined,
-              gradient: const [Color(0xFF34D399), Color(0xFF059669)],
-            ),
-            _SummaryCardData(
-              title: 'Pending Amounts',
-              value: _pendingCount.toString(),
-              subtitle: 'Awaiting confirmation',
-              icon: Icons.schedule_outlined,
-              gradient: const [Color(0xFFFCD34D), Color(0xFFF59E0B)],
-            ),
-            _SummaryCardData(
-              title: 'Overdue Alerts',
-              value: _overdueCount.toString(),
-              subtitle: 'Require follow-up',
-              icon: Icons.warning_amber_outlined,
-              gradient: const [Color(0xFFF87171), Color(0xFFDC2626)],
-            ),
-          ];
-
-          return Wrap(
-            spacing: 16.w,
-            runSpacing: 16.h,
-            children: cards
-                .map(
-                  (card) => SizedBox(
-                    width: isWide
-                        ? (constraints.maxWidth - 48.w) / 4
-                        : constraints.maxWidth > 650
-                        ? (constraints.maxWidth - 32.w) / 2
-                        : constraints.maxWidth,
-                    child: _SummaryCard(data: card),
-                  ),
-                )
-                .toList(),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildResponsiveListing() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth > 950) {
-          return _buildDesktopTable();
-        }
-        if (constraints.maxWidth > 600) {
-          return _buildTabletGrid();
-        }
-        return _buildMobileList();
-      },
-    );
-  }
-
-  Widget _buildDesktopTable() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
+          SizedBox(height: 10.h),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
+            height: 48.h,
             decoration: BoxDecoration(
-              color: const Color(0xFFFAF7F6),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.light
+                    ? const Color(0xFF8B6F47)
+                    : Colors.white24,
+              ),
+              boxShadow: Theme.of(context).brightness == Brightness.light
+                  ? [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
-            child: Row(
+            child: TextField(
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.grey[800]
+                    : Colors.white,
+              ),
+              onChanged: (v) => setState(() => _search = v),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[600]
+                      : Colors.white70,
+                ),
+                hintText: 'Search by invoice number or customer name...',
+                hintStyle: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.grey[600]
+                      : Colors.white70,
+                ),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openBillDetail(int billId) async {
+    BillDetail? detail;
+    try {
+      detail = await _billService.getBillWithItems(billId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching bill: $e')));
+      }
+      return;
+    }
+    if (detail == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Bill not found')));
+      }
+      return;
+    }
+
+    final bill = detail.bill;
+    final items = detail.items;
+
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18.r)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                _buildTableHeaderCell('Invoice', flex: 3),
-                _buildTableHeaderCell('Customer', flex: 3),
-                _buildTableHeaderCell('Issued On'),
-                _buildTableHeaderCell('Status'),
-                _buildTableHeaderCell('Total', textAlign: TextAlign.right),
-                SizedBox(width: 48.w),
+                Text(
+                  bill.billNumber,
+                  style: GoogleFonts.inter(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Chip(
+                  label: Text(bill.paymentStatus.toUpperCase()),
+                  backgroundColor: bill.paymentStatus == 'paid'
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
+                  labelStyle: GoogleFonts.inter(
+                    color: bill.paymentStatus == 'paid'
+                        ? Colors.green
+                        : Colors.orange,
+                  ),
+                ),
               ],
             ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              itemCount: _visibleInvoices.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: Colors.grey[200]),
-              itemBuilder: (context, index) {
-                final invoice = _visibleInvoices[index];
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 20.w,
-                    vertical: 16.h,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              invoice.bill.billNumber,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF3A3A3A),
-                              ),
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              '${invoice.items.length} items',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              invoice.customerName,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              invoice.customerContact,
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          _formatDate(invoice.bill.billDate),
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.sp,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: _buildStatusChip(invoice.bill.paymentStatus),
-                        ),
-                      ),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            '₹${invoice.bill.totalAmount.toStringAsFixed(2)}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFB48F85),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 16.w),
-                      _buildViewButton(invoice),
-                    ],
-                  ),
-                );
-              },
+            SizedBox(height: 10.h),
+            ...items.map(
+              (i) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Product ${i.productId}'),
+                subtitle: Text(
+                  'Qty ${i.quantity} • ₹${i.unitPrice.toStringAsFixed(2)}',
+                ),
+                trailing: Text('₹${i.totalPrice.toStringAsFixed(2)}'),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabletGrid() {
-    return GridView.builder(
-      padding: EdgeInsets.only(bottom: 80.h),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16.w,
-        mainAxisSpacing: 16.h,
-        childAspectRatio: 1.45,
-      ),
-      itemCount: _visibleInvoices.length,
-      itemBuilder: (context, index) {
-        final invoice = _visibleInvoices[index];
-        return _BillingCard(
-          invoice: invoice,
-          onTap: () => _showInvoiceDetails(invoice),
-          onMarkPaid: () => _showMarkAsPaidDialog(invoice),
-          onEdit: () => _showEditInvoiceDialog(invoice),
-        );
-      },
-    );
-  }
-
-  Widget _buildMobileList() {
-    return ListView.builder(
-      padding: EdgeInsets.only(bottom: 80.h),
-      itemCount: _visibleInvoices.length,
-      itemBuilder: (context, index) {
-        final invoice = _visibleInvoices[index];
-        return _BillingCard(
-          invoice: invoice,
-          onTap: () => _showInvoiceDetails(invoice),
-          onMarkPaid: () => _showMarkAsPaidDialog(invoice),
-          onEdit: () => _showEditInvoiceDialog(invoice),
-        );
-      },
-    );
-  }
-
-  Widget _buildViewButton(_InvoiceViewModel invoice) {
-    return ElevatedButton(
-      onPressed: () => _showInvoiceDetails(invoice),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFB48F85),
-        foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.r),
+            const Divider(),
+            _infoRow('Subtotal', '₹${bill.subtotal.toStringAsFixed(2)}'),
+            _infoRow('Tax', '₹${bill.taxAmount.toStringAsFixed(2)}'),
+            _infoRow('Discount', '₹${bill.discountAmount.toStringAsFixed(2)}'),
+            _infoRow('Total', '₹${bill.totalAmount.toStringAsFixed(2)}'),
+            SizedBox(height: 12.h),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final savedPath = await _pdfService.saveBillPDF(
+                        bill,
+                        items,
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              savedPath == 'downloaded'
+                                  ? 'PDF downloaded'
+                                  : 'Saved to: $savedPath',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.download),
+                    label: const Text('Download'),
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B6F47),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _pdfService.shareBill(bill, items);
+                    },
+                    icon: const Icon(Icons.share),
+                    label: const Text('Share'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-      child: Text('View', style: GoogleFonts.poppins(fontSize: 13.sp)),
     );
   }
 
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(color: Color(0xFFB48F85)),
-          SizedBox(height: 16.h),
-          Text(
-            'Fetching billing data...',
-            style: GoogleFonts.poppins(color: Colors.grey[600]),
+  Future<void> _confirmDelete(int billId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Invoice'),
+        content: const Text(
+          'Are you sure you want to delete this invoice? This will restore product stock.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    if (ok != true) return;
+
+    try {
+      await _billService.deleteBill(billId);
+      if (mounted) {
+        await _loadAll();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invoice deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 80, color: Colors.grey[400]),
-          SizedBox(height: 16.h),
-          Text(
-            'No invoices found',
-            style: GoogleFonts.poppins(
-              fontSize: 18.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            'Try adjusting your filters or create a new invoice.',
-            style: GoogleFonts.poppins(
-              fontSize: 13.sp,
-              color: Colors.grey[500],
-            ),
-          ),
-          SizedBox(height: 16.h),
-          OutlinedButton.icon(
-            onPressed: _showCreateInvoiceSheet,
-            icon: const Icon(Icons.add),
-            label: Text('Create Invoice', style: GoogleFonts.poppins()),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFB48F85),
-              side: const BorderSide(color: Color(0xFFB48F85)),
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableHeaderCell(
-    String label, {
-    int flex = 1,
-    TextAlign textAlign = TextAlign.left,
+  Widget _readonlyField(
+    String label,
+    TextEditingController ctrl, {
+    int maxLines = 1,
+    bool readOnly = false,
   }) {
-    return Expanded(
-      flex: flex,
-      child: Text(
-        label,
-        textAlign: textAlign,
-        style: GoogleFonts.poppins(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF6B5E54),
+    return TextField(
+      controller: ctrl,
+      readOnly: readOnly,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Theme.of(context).cardColor,
+        labelStyle: TextStyle(
+          color: Theme.of(context).brightness == Brightness.light
+              ? Colors.grey[600]
+              : Colors.white70,
         ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+      ),
+      style: TextStyle(
+        color: Theme.of(context).brightness == Brightness.light
+            ? Colors.grey[800]
+            : Colors.white,
       ),
     );
   }
 
-  Widget _buildDetailRow({required String label, required String value}) {
+  Widget _infoRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4.h),
+      padding: EdgeInsets.symmetric(vertical: 2.h),
       child: Row(
         children: [
           SizedBox(
-            width: 110.w,
+            width: 140.w,
             child: Text(
               label,
-              style: GoogleFonts.poppins(
-                fontSize: 12.sp,
-                color: Colors.grey[600],
+              style: GoogleFonts.inter(
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.grey[600]
+                    : Colors.grey[700],
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: GoogleFonts.poppins(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF3A3A3A),
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.grey[800]
+                    : Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           ),
@@ -1075,386 +1135,7 @@ class _BillingScreenState extends State<BillingScreen>
     );
   }
 
-  Widget _buildSummaryRow(String label, double value, {Color? valueColor}) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 14.sp,
-                color: Colors.grey[700],
-              ),
-            ),
-          ),
-          Text(
-            '₹${value.toStringAsFixed(2)}',
-            style: GoogleFonts.poppins(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: valueColor ?? const Color(0xFF3A3A3A),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChip({
-    required String label,
-    required bool isActive,
-    required VoidCallback onSelected,
-  }) {
-    return GestureDetector(
-      onTap: onSelected,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [Color(0xFFB48F85), Color(0xFF9A7A6F)],
-                )
-              : null,
-          color: isActive ? null : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20.r),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w600,
-            color: isActive ? Colors.white : Colors.grey[600],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOutlinedButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-  }) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18, color: const Color(0xFFB48F85)),
-      label: Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFFB48F85),
-        ),
-      ),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFB48F85)),
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30.r),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuTriggerButton({
-    required IconData icon,
-    required String label,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30.r),
-        border: const Border.fromBorderSide(
-          BorderSide(color: Color(0xFFB48F85)),
-        ),
-        color: Colors.white,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: const Color(0xFFB48F85)),
-          SizedBox(width: 8.w),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFFB48F85),
-            ),
-          ),
-          SizedBox(width: 4.w),
-          const Icon(
-            Icons.keyboard_arrow_down,
-            size: 18,
-            color: Color(0xFFB48F85),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusChip(String status) {
-    late Color bg;
-    late Color fg;
-    switch (status.toLowerCase()) {
-      case 'paid':
-        bg = const Color(0xFFDCFCE7);
-        fg = const Color(0xFF166534);
-        break;
-      case 'pending':
-        bg = const Color(0xFFFFF7E6);
-        fg = const Color(0xFFB45309);
-        break;
-      case 'overdue':
-        bg = const Color(0xFFFFE4E6);
-        fg = const Color(0xFFB91C1C);
-        break;
-      default:
-        bg = const Color(0xFFE5E7EB);
-        fg = const Color(0xFF1F2937);
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Text(
-        status,
-        style: GoogleFonts.poppins(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showExportDialog() async {
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.r),
-          ),
-          title: Text(
-            'Export Invoices',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExportOption(
-                Icons.picture_as_pdf_outlined,
-                'Export as PDF',
-              ),
-              _buildExportOption(Icons.grid_on_outlined, 'Export as Excel'),
-              _buildExportOption(Icons.share_outlined, 'Share summary report'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close', style: GoogleFonts.poppins()),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Export task queued.',
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                    backgroundColor: const Color(0xFFB48F85),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB48F85),
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Confirm', style: GoogleFonts.poppins()),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildExportOption(IconData icon, String label) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: const Color(0xFFB48F85)),
-      title: Text(label, style: GoogleFonts.poppins(fontSize: 14.sp)),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
-    );
-  }
-
-  void _showSettingsDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.r),
-          ),
-          title: Text(
-            'Billing Preferences',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwitchListTile(
-                value: true,
-                onChanged: (_) {},
-                title: Text(
-                  'Include tax summary on PDF',
-                  style: GoogleFonts.poppins(),
-                ),
-                activeColor: const Color(0xFFB48F85),
-              ),
-              SwitchListTile(
-                value: true,
-                onChanged: (_) {},
-                title: Text(
-                  'Send email notifications to customers',
-                  style: GoogleFonts.poppins(),
-                ),
-                activeColor: const Color(0xFFB48F85),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close', style: GoogleFonts.poppins()),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB48F85),
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Save', style: GoogleFonts.poppins()),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  List<_InvoiceViewModel> _generateMockInvoices() {
-    final random = Random();
-    final customers = [
-      _Customer(
-        name: 'Aarav Patel',
-        contact: '+91 98765 32109',
-        email: 'aarav.patel@mail.com',
-      ),
-      _Customer(
-        name: 'Diya Shah',
-        contact: '+91 98220 12345',
-        email: 'diya.s@fashionstudio.com',
-      ),
-      _Customer(
-        name: 'Krishna Mehta',
-        contact: '+91 98989 45678',
-        email: 'krish.m@ensemble.in',
-      ),
-      _Customer(
-        name: 'Sneha Verma',
-        contact: '+91 98111 90876',
-        email: 'sneha.v@stylelane.com',
-      ),
-      _Customer(
-        name: 'Rahul Desai',
-        contact: '+91 90909 70707',
-        email: 'rahul.desai@ornate.co',
-      ),
-    ];
-
-    final statuses = ['Paid', 'Pending', 'Overdue'];
-    final List<_InvoiceViewModel> invoices = [];
-
-    for (int i = 0; i < 14; i++) {
-      final customer = customers[random.nextInt(customers.length)];
-      final billNumber = '#INV-${202400 + i}';
-      final billDate = DateTime.now().subtract(
-        Duration(days: random.nextInt(45)),
-      );
-
-      final itemsCount = random.nextInt(4) + 2;
-      final items = List<_InvoiceItem>.generate(itemsCount, (index) {
-        final quantity = random.nextInt(4) + 1;
-        final price = (random.nextInt(20) + 5) * 150.0;
-        final name = [
-          'Designer Necklace',
-          'Polki Earrings',
-          'Kundan Bracelet',
-          'Antique Ring',
-          'Temple Maangtikka',
-          'Choker Set',
-        ][random.nextInt(6)];
-        return _InvoiceItem(
-          name: name,
-          quantity: quantity,
-          unitPrice: price,
-          totalPrice: quantity * price,
-        );
-      });
-
-      final subtotal = items.fold<double>(
-        0,
-        (prev, item) => prev + item.totalPrice,
-      );
-      final tax = subtotal * 0.05;
-      final discount = subtotal * (random.nextBool() ? 0.08 : 0.12);
-      final total = subtotal + tax - discount;
-      final status = statuses[random.nextInt(statuses.length)];
-
-      final bill = Bill(
-        billNumber: billNumber,
-        customerId: customers.indexOf(customer) + 1,
-        subtotal: subtotal,
-        taxAmount: tax,
-        discountAmount: discount,
-        totalAmount: total,
-        billDate: billDate,
-        paymentStatus: status,
-        notes: random.nextBool()
-            ? 'Custom-made order. Deliver after polishing and quality check.'
-            : null,
-        createdAt: DateTime.now().subtract(Duration(days: random.nextInt(60))),
-      );
-
-      invoices.add(
-        _InvoiceViewModel(
-          bill: bill,
-          customerName: customer.name,
-          customerContact: customer.contact,
-          customerEmail: customer.email,
-          items: items,
-        ),
-      );
-    }
-
-    return invoices;
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')} ${_monthShort(date.month)} ${date.year}';
-  }
-
-  String _monthShort(int month) {
+  String _monthName(int m) {
     const months = [
       'Jan',
       'Feb',
@@ -1469,740 +1150,15 @@ class _BillingScreenState extends State<BillingScreen>
       'Nov',
       'Dec',
     ];
-    return months[month - 1];
+    return months[m - 1];
   }
 }
 
-class _SummaryCardData {
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-  final List<Color> gradient;
-
-  const _SummaryCardData({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-  });
-}
-
-class _SummaryCard extends StatelessWidget {
-  final _SummaryCardData data;
-
-  const _SummaryCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(20.w),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: data.gradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20.r),
-        boxShadow: [
-          BoxShadow(
-            color: data.gradient.last.withOpacity(0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(14.r),
-                ),
-                child: Icon(data.icon, color: Colors.white),
-              ),
-              const Spacer(),
-              Icon(Icons.more_horiz, color: Colors.white.withOpacity(0.7)),
-            ],
-          ),
-          SizedBox(height: 16.h),
-          Text(
-            data.value,
-            style: GoogleFonts.poppins(
-              fontSize: 26.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            data.title,
-            style: GoogleFonts.poppins(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            data.subtitle,
-            style: GoogleFonts.poppins(fontSize: 11.sp, color: Colors.white70),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InvoiceViewModel {
-  final Bill bill;
-  final String customerName;
-  final String customerContact;
-  final String customerEmail;
-  final List<_InvoiceItem> items;
-
-  const _InvoiceViewModel({
-    required this.bill,
-    required this.customerName,
-    required this.customerContact,
-    required this.customerEmail,
-    required this.items,
-  });
-
-  _InvoiceViewModel copyWith({Bill? bill}) {
-    return _InvoiceViewModel(
-      bill: bill ?? this.bill,
-      customerName: customerName,
-      customerContact: customerContact,
-      customerEmail: customerEmail,
-      items: items,
-    );
-  }
-}
-
-class _InvoiceItem {
-  final String name;
+class _BillLine {
+  final Product product;
   final int quantity;
-  final double unitPrice;
-  final double totalPrice;
 
-  const _InvoiceItem({
-    required this.name,
-    required this.quantity,
-    required this.unitPrice,
-    required this.totalPrice,
-  });
-}
+  _BillLine({required this.product, required this.quantity});
 
-class _Customer {
-  final String name;
-  final String contact;
-  final String email;
-
-  const _Customer({
-    required this.name,
-    required this.contact,
-    required this.email,
-  });
-}
-
-class _BillingCard extends StatelessWidget {
-  final _InvoiceViewModel invoice;
-  final VoidCallback onTap;
-  final VoidCallback onMarkPaid;
-  final VoidCallback onEdit;
-
-  const _BillingCard({
-    required this.invoice,
-    required this.onTap,
-    required this.onMarkPaid,
-    required this.onEdit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 16.h),
-      padding: EdgeInsets.all(18.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      invoice.bill.billNumber,
-                      style: GoogleFonts.poppins(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF3A3A3A),
-                      ),
-                    ),
-                    SizedBox(height: 6.h),
-                    Text(
-                      invoice.customerName,
-                      style: GoogleFonts.poppins(
-                        fontSize: 13.sp,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      '${invoice.items.length} line items · ${invoice.customerContact}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.sp,
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '₹${invoice.bill.totalAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFFB48F85),
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    _formatDateStatic(invoice.bill.billDate),
-                    style: GoogleFonts.poppins(
-                      fontSize: 12.sp,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          SizedBox(height: 16.h),
-          Row(
-            children: [
-              _StatusChip(status: invoice.bill.paymentStatus),
-              SizedBox(width: 12.w),
-              Text(
-                invoice.customerEmail,
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 16.h),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onEdit,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFB48F85),
-                    side: const BorderSide(color: Color(0xFFB48F85)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  child: Text('Edit', style: GoogleFonts.poppins()),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onMarkPaid,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF34D399),
-                    side: const BorderSide(color: Color(0xFF34D399)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  child: Text('Mark Paid', style: GoogleFonts.poppins()),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              ElevatedButton(
-                onPressed: onTap,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFB48F85),
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 18.w,
-                    vertical: 12.h,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                ),
-                child: Text('View', style: GoogleFonts.poppins()),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _formatDateStatic(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')} ${_monthShortStatic(date.month)} ${date.year}';
-  }
-
-  static String _monthShortStatic(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return months[month - 1];
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-
-  const _StatusChip({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    late Color bg;
-    late Color fg;
-    switch (status.toLowerCase()) {
-      case 'paid':
-        bg = const Color(0xFFDCFCE7);
-        fg = const Color(0xFF166534);
-        break;
-      case 'pending':
-        bg = const Color(0xFFFFF7E6);
-        fg = const Color(0xFFB45309);
-        break;
-      case 'overdue':
-        bg = const Color(0xFFFFE4E6);
-        fg = const Color(0xFFB91C1C);
-        break;
-      default:
-        bg = const Color(0xFFE5E7EB);
-        fg = const Color(0xFF1F2937);
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Text(
-        status,
-        style: GoogleFonts.poppins(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
-      ),
-    );
-  }
-}
-
-class _InvoiceFormSheet extends StatefulWidget {
-  final _InvoiceViewModel? existingInvoice;
-  final ValueChanged<_InvoiceViewModel> onSubmit;
-
-  const _InvoiceFormSheet({required this.onSubmit, this.existingInvoice});
-
-  @override
-  State<_InvoiceFormSheet> createState() => _InvoiceFormSheetState();
-}
-
-class _InvoiceFormSheetState extends State<_InvoiceFormSheet> {
-  late TextEditingController _invoiceNumberController;
-  late TextEditingController _customerNameController;
-  late TextEditingController _customerContactController;
-  late TextEditingController _customerEmailController;
-  late TextEditingController _notesController;
-  DateTime _issueDate = DateTime.now();
-  String _status = 'Pending';
-  List<_InvoiceItem> _items = [];
-
-  @override
-  void initState() {
-    super.initState();
-    final existing = widget.existingInvoice;
-    _invoiceNumberController = TextEditingController(
-      text:
-          existing?.bill.billNumber ??
-          '#INV-${DateTime.now().millisecondsSinceEpoch % 100000}',
-    );
-    _customerNameController = TextEditingController(
-      text: existing?.customerName ?? '',
-    );
-    _customerContactController = TextEditingController(
-      text: existing?.customerContact ?? '',
-    );
-    _customerEmailController = TextEditingController(
-      text: existing?.customerEmail ?? '',
-    );
-    _notesController = TextEditingController(text: existing?.bill.notes ?? '');
-    _issueDate = existing?.bill.billDate ?? DateTime.now();
-    _status = existing?.bill.paymentStatus ?? 'Pending';
-    _items =
-        existing?.items ??
-        [
-          const _InvoiceItem(
-            name: 'Designer Necklace',
-            quantity: 1,
-            unitPrice: 3500,
-            totalPrice: 3500,
-          ),
-        ];
-  }
-
-  @override
-  void dispose() {
-    _invoiceNumberController.dispose();
-    _customerNameController.dispose();
-    _customerContactController.dispose();
-    _customerEmailController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  void _addItem() {
-    setState(() {
-      _items = [
-        ..._items,
-        const _InvoiceItem(
-          name: 'Custom Jewellery Piece',
-          quantity: 1,
-          unitPrice: 2500,
-          totalPrice: 2500,
-        ),
-      ];
-    });
-  }
-
-  void _removeItem(int index) {
-    setState(() => _items = List.of(_items)..removeAt(index));
-  }
-
-  void _submit() {
-    if (_customerNameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Customer name is required',
-            style: GoogleFonts.poppins(color: Colors.white),
-          ),
-          backgroundColor: Colors.red[400],
-        ),
-      );
-      return;
-    }
-
-    final subtotal = _items.fold<double>(0, (prev, e) => prev + e.totalPrice);
-    final tax = subtotal * 0.05;
-    final discount = subtotal * 0.08;
-    final total = subtotal + tax - discount;
-
-    final bill = Bill(
-      billNumber: _invoiceNumberController.text.trim(),
-      customerId: 0,
-      subtotal: subtotal,
-      taxAmount: tax,
-      discountAmount: discount,
-      totalAmount: total,
-      billDate: _issueDate,
-      paymentStatus: _status,
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-      createdAt: DateTime.now(),
-    );
-
-    widget.onSubmit(
-      _InvoiceViewModel(
-        bill: bill,
-        customerName: _customerNameController.text.trim(),
-        customerContact: _customerContactController.text.trim(),
-        customerEmail: _customerEmailController.text.trim(),
-        items: _items,
-      ),
-    );
-    Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 200),
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 60.w,
-                  height: 6.h,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(3.r),
-                  ),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              Text(
-                widget.existingInvoice == null
-                    ? 'Create Invoice'
-                    : 'Edit Invoice',
-                style: GoogleFonts.poppins(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF3A3A3A),
-                ),
-              ),
-              SizedBox(height: 18.h),
-              _buildTextField(
-                controller: _invoiceNumberController,
-                label: 'Invoice Number',
-                prefixIcon: Icons.tag_outlined,
-              ),
-              SizedBox(height: 12.h),
-              _buildTextField(
-                controller: _customerNameController,
-                label: 'Customer Name',
-                prefixIcon: Icons.person_outline,
-              ),
-              SizedBox(height: 12.h),
-              _buildTextField(
-                controller: _customerContactController,
-                label: 'Customer Contact',
-                prefixIcon: Icons.phone_outlined,
-              ),
-              SizedBox(height: 12.h),
-              _buildTextField(
-                controller: _customerEmailController,
-                label: 'Customer Email',
-                prefixIcon: Icons.email_outlined,
-              ),
-              SizedBox(height: 12.h),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(
-                  Icons.calendar_today_outlined,
-                  color: Color(0xFFB48F85),
-                ),
-                title: Text(
-                  'Invoice Date',
-                  style: GoogleFonts.poppins(fontSize: 13.sp),
-                ),
-                subtitle: Text(
-                  _BillingCard._formatDateStatic(_issueDate),
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _issueDate,
-                    firstDate: DateTime(DateTime.now().year - 2),
-                    lastDate: DateTime(DateTime.now().year + 1),
-                  );
-                  if (picked != null) {
-                    setState(() => _issueDate = picked);
-                  }
-                },
-              ),
-              SizedBox(height: 12.h),
-              DropdownButtonFormField<String>(
-                value: _status,
-                decoration: InputDecoration(
-                  labelText: 'Payment Status',
-                  prefixIcon: const Icon(Icons.flag_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Paid', child: Text('Paid')),
-                  DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-                  DropdownMenuItem(value: 'Overdue', child: Text('Overdue')),
-                ],
-                onChanged: (value) =>
-                    setState(() => _status = value ?? 'Pending'),
-              ),
-              SizedBox(height: 18.h),
-              Text(
-                'Line Items',
-                style: GoogleFonts.poppins(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 12.h),
-              ..._items.asMap().entries.map(
-                (entry) => Container(
-                  margin: EdgeInsets.only(bottom: 10.h),
-                  padding: EdgeInsets.all(14.w),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFAF7F6),
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              entry.value.name,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              '${entry.value.quantity} pcs · ₹${entry.value.unitPrice.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '₹${entry.value.totalPrice.toStringAsFixed(2)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFFB48F85),
-                        ),
-                      ),
-                      SizedBox(width: 8.w),
-                      IconButton(
-                        onPressed: () => _removeItem(entry.key),
-                        icon: const Icon(Icons.close, size: 18),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 8.h),
-              OutlinedButton.icon(
-                onPressed: _addItem,
-                icon: const Icon(Icons.add),
-                label: Text('Add item', style: GoogleFonts.poppins()),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFB48F85),
-                  side: const BorderSide(color: Color(0xFFB48F85)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                ),
-              ),
-              SizedBox(height: 18.h),
-              _buildTextField(
-                controller: _notesController,
-                label: 'Additional Notes',
-                prefixIcon: Icons.note_alt_outlined,
-                maxLines: 3,
-              ),
-              SizedBox(height: 22.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('Cancel', style: GoogleFonts.poppins()),
-                    ),
-                  ),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFB48F85),
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                      ),
-                      child: Text(
-                        widget.existingInvoice == null ? 'Create' : 'Update',
-                        style: GoogleFonts.poppins(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 10.h),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData prefixIcon,
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(prefixIcon, color: const Color(0xFFB48F85)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14.r)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14.r),
-          borderSide: const BorderSide(color: Color(0xFFB48F85), width: 2),
-        ),
-      ),
-    );
-  }
+  double get totalPrice => quantity * product.price;
 }
